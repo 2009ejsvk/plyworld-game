@@ -239,7 +239,7 @@ body { background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, sans-
 
 <script>
 const $ = id => document.getElementById(id);
-const DATA_V = "47-village";                                                    // 키트 자료 판 (바꿔 올릴 때 올림: 브라우저에 남은 옛 자료와 섞이지 않게)
+const DATA_V = "48-village";                                                    // 키트 자료 판 (바꿔 올릴 때 올림: 브라우저에 남은 옛 자료와 섞이지 않게)
 const cssColor = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 let KIT, slots = {}, placed = new Set(), selected = null, stats = { miss: 0, hint: 0 }, timer = null, started = 0;
 
@@ -998,14 +998,14 @@ function decorateVillage(){
   }
   const used=[];VILLAGE.placedProps=[];VILLAGE.planted=[];
   for(const [kind,x,z,rot] of VILLAGE.props){
-    const r={bench:10.5,lamp:5,sign:8,planter:8.5}[kind],candidates=[[x,z]];
+    const r={bench:10.5,lamp:6,sign:8,planter:8.5}[kind],candidates=[[x,z]];
     for(const distance of [4,8,12,16,20,24])for(let i=0;i<12;i++){const a=i*Math.PI/6;candidates.push([x+Math.cos(a)*distance,z+Math.sin(a)*distance]);}
     const site=candidates.find(([a,b])=>villageClear(a,b,r,false)&&Math.hypot(a,b)>r+37&&!used.some(([c,d,r0])=>Math.hypot(a-c,b-d)<r+r0+2));
     if(!site)continue;const [a,b]=site;
     VILLAGE.placedProps.push([kind,a,b,rot,r]);mapRoot.add(mapProp(kind,a,b,rot));used.push([a,b,r]);
   }
   for(const [kind,x,z,k] of VILLAGE.nature){
-    const r=({oak:28,pine:22,bush:12,rock:8}[kind])*k;
+    const r=({oak:28,pine:22,bush:15,rock:10}[kind])*k;
     if(!villageClear(x,z,r)||used.some(([a,b,r0])=>Math.hypot(x-a,z-b)<(r+r0)*.82))continue;
     const obj=kind==='bush'?bush(x,z,k,VILLAGE.planted.length+3):kind==='rock'?rock(x,z,k,VILLAGE.planted.length+5):tree(x,z,k,kind,VILLAGE.planted.length+1);
     obj.userData.decorKind=kind;obj.userData.clearanceRadius=r;mapRoot.add(obj);VILLAGE.planted.push([kind,x,z,k,r]);used.push([x,z,r]);
