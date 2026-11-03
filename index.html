@@ -198,6 +198,7 @@ body { background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, sans-
         <button type="button" class="icon" id="b-hint" title="힌트" aria-label="힌트"><svg><use href="#i-bulb"/></svg></button>
         <button type="button" class="icon" id="b-play" title="자동 조립" aria-label="자동 조립" aria-pressed="false"><svg><use href="#i-play"/></svg></button>
         <button type="button" class="icon" id="b-speed" title="자동 조립 빠르기 1배" aria-label="자동 조립 빠르기 1배"><span class="spd">1×</span></button>
+        <button type="button" class="icon" id="b-bridge" hidden title="도개교 올리기" aria-label="도개교 올리기"><svg viewBox="0 0 24 24"><path d="M3 20h18M5 18V8m0 10L17 6m-4 0h4v4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
         <button type="button" class="icon" id="b-rot" title="완성 후 돌기" aria-label="완성 후 돌기" aria-pressed="true"><svg><use href="#i-spin"/></svg></button>
         <button type="button" class="icon" id="b-skip" title="완성 보기" aria-label="완성 보기"><svg><use href="#i-skip"/></svg></button>
         <button type="button" class="icon" id="b-ghost" title="실루엣 진하게" aria-label="실루엣 진하게" aria-pressed="false"><svg><use href="#i-eye"/></svg></button>
@@ -224,7 +225,7 @@ body { background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, sans-
 
 <script>
 const $ = id => document.getElementById(id);
-const DATA_V = "41-pavilions";                                                    // 키트 자료 판 (바꿔 올릴 때 올림: 브라우저에 남은 옛 자료와 섞이지 않게)
+const DATA_V = "42-lock";                                                    // 키트 자료 판 (바꿔 올릴 때 올림: 브라우저에 남은 옛 자료와 섞이지 않게)
 const cssColor = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 let KIT, slots = {}, placed = new Set(), selected = null, stats = { miss: 0, hint: 0 }, timer = null, started = 0;
 
@@ -304,8 +305,66 @@ function setSound(on) {
 $("b-sound").addEventListener("click", () => setSound(!SND.on)); setSound(SND.on);
 
 // ---------- 다 지으면 움직임: 풍차 날개는 축째로 돌고, 수레는 바퀴째로 앞뒤로 굴러감 (각 = 간 거리 / 반지름). 무엇이든 만지면 멈추고 제자리
+// A bridge's assembly pieces retain their current physical configuration.
+// The handle moves the bridge only; keys use the ordinary pick/place/remove UI.
+let bridgeState = null;
+function newBridgeState() { return KIT?.bridgeLock ? { raised:false,barWork:false,pinWork:false,busy:false,needsSync:false } : null; }
+function bridgeStateName() { return `${+bridgeState.raised}:${+bridgeState.barWork}:${+bridgeState.pinWork}`; }
+function bridgeButton() {
+  const b=$("b-bridge"),l=KIT?.bridgeLock;
+  b.hidden=!l || mapOn;
+  if (!l || !bridgeState) return;
+  b.disabled=bridgeState.busy || flights.length>0 || !MOD.bridge?.joined ||
+    [...l.parts,...l.supports].some(q=>!placed.has(q));
+  b.title=bridgeState.raised ? "도개교 내리기" : "도개교 올리기";
+  b.setAttribute("aria-label",b.title);b.setAttribute("aria-pressed",String(bridgeState.raised));
+}
+function bridgePose(s,W) {
+  s.base.copy(W);
+  const L=s.parentRestInverse.clone().multiply(W),quaternion=new THREE.Quaternion(),scale=new THREE.Vector3();
+  L.decompose(s.home,quaternion,scale);
+  s.mesh.quaternion.copy(quaternion);s.mesh.scale.copy(scale);s.mesh.matrixAutoUpdate=true;
+  if (!flights.some(f=>f.mesh===s.mesh) && (placed.has(s.id) || !s.mesh.visible)) s.mesh.position.copy(homeOf(s.id));
+  s.ghost.matrix.copy(new THREE.Matrix4().makeTranslation(...offOf(s.module).toArray()).multiply(W));
+}
+function syncBridgeState() {
+  const l=KIT?.bridgeLock;
+  if (!l || !bridgeState) {bridgeButton();return;}
+  if (bridgeState.busy) {bridgeButton();return;}
+  // Finish removing a key before turning its hidden stock mesh towards the
+  // alternative socket. Its visible removal travels along the old free path.
+  if ([l.bar,l.keeper].some(q=>flights.some(f=>f.mesh===slots[q].mesh) || (!placed.has(q)&&slots[q].mesh.visible))) {bridgeState.needsSync=true;bridgeButton();return;}
+  bridgeState.needsSync=false;
+  if (!placed.has(l.bar)) bridgeState.barWork=bridgeState.raised;
+  if (!placed.has(l.keeper)) bridgeState.pinWork=placed.has(l.bar)?bridgeState.barWork:bridgeState.raised;
+  const state=l.states[bridgeStateName()]; KIT.joints=state.joints;
+  for (const q of Object.keys(slots)) slots[q].out=state.out[q];
+  for (const q of [...l.parts,l.bar,l.keeper]) {
+    const M=state.transforms[q]?new THREE.Matrix4().set(...state.transforms[q]):new THREE.Matrix4();
+    bridgePose(slots[q],M.multiply(slots[q].restBase));
+  }
+  bridgeButton();
+}
+function moveBridge() {
+  const l=KIT?.bridgeLock;if (!l || !bridgeState || $("b-bridge").disabled) return;
+  const hit=l.states[bridgeStateName()].blockers.filter(q=>placed.has(q));
+  if (hit.length) {flash(hit);sfx("wait");return;}
+  stopDemo();stopMotion();controls.autoRotate=false;bridgeState.busy=true;const operation=bridgeState;bridgeButton();
+  const opening=!bridgeState.raised,start=performance.now(),from=bridgeState.raised?l.angle:0,to=opening?l.angle:0;
+  const frame=now=>{
+    if (!KIT?.bridgeLock || bridgeState!==operation) return;
+    const t=Math.min(1,(now-start)/700),e=t*t*(3-2*t),angle=(from+(to-from)*e)*Math.PI/180;
+    const S=turnAbout(new THREE.Vector3(...l.pivot),new THREE.Vector3(...l.axis),angle);
+    for (const q of l.parts) bridgePose(slots[q],S.clone().multiply(slots[q].restBase));
+    if (t<1) return requestAnimationFrame(frame);
+    bridgeState.raised=opening;bridgeState.busy=false;syncBridgeState();sfx("place");
+  };
+  requestAnimationFrame(frame);
+}
+$("b-bridge").addEventListener("click",moveBridge);
 let motion = null;
 function startMotion() {
+  if (KIT?.bridgeLock) { syncBridgeState(); return; }
   const mo = KIT.motion; if (!mo || !mo.spin) return;
   if (mo.pivot) return startRig(mo);
   if (mo.spins && mo.circle) {                                                                   // 모터: 바퀴 무리마다 축 (자리·방향은 키트가 줌), 원 중심
@@ -914,6 +973,7 @@ function unloadKit() {
   for (const m of Object.keys(MOD)) { MOD[m].btn?.remove(); delete MOD[m]; }
   if (M.built) { M.renderer.dispose(); $("m-view").innerHTML = ""; M.built = false; }
   $("manual").hidden = true; $("done").hidden = true; controls.autoRotate = false;
+  bridgeState=null; $("b-bridge").hidden=true;
   slots = {}; KIT = null; $("sheet").innerHTML = "";
 }
 async function switchKit(id) {
@@ -946,10 +1006,10 @@ async function loadKit(id) {
     const toLocal = new THREE.Matrix4().copy(mesh.parent.matrixWorld).invert();             // 방향 (glTF 세계) -> 판 부모 좌표
     const local = meta.dirs.map(d => new THREE.Vector3(...d).transformDirection(toLocal));  // 6 방향, 판 부모 좌표로
     mesh.userData.id = p.id;
-    slots[p.id] = { ...p, mesh, ghost, home: mesh.position.clone(), local, base: mesh.matrixWorld.clone(), toLocal3: new THREE.Matrix3().setFromMatrix4(toLocal) };
+    slots[p.id] = { ...p, mesh, ghost, home: mesh.position.clone(), local, base: mesh.matrixWorld.clone(), restBase: mesh.matrixWorld.clone(), parentRestInverse: toLocal.clone(), toLocal3: new THREE.Matrix3().setFromMatrix4(toLocal) };
     mesh.visible = false;
   }
-  KIT = meta;
+  KIT = meta; bridgeState=newBridgeState();
   layoutModules();
   const box = new THREE.Box3(); for (const s of Object.values(slots)) box.union(boxOf(s, offOf(s.module)));   // 탁자 위 덩어리까지 다 보이게
   const c = box.getCenter(new THREE.Vector3());
@@ -1073,8 +1133,9 @@ function placeButtons() {                                             // 덩어�
     if (b.dataset.icon !== want) { b.dataset.icon = want; b.innerHTML = want === "join" ? joinIcon : splitIcon; b.title = want === "join" ? "합치기" : "떼어 내기"; b.setAttribute("aria-label", b.title); }
   }
 }
-const allJoined = () => KIT.modules.every(m => MOD[m].joined);
-function checkDone() { if (placed.size === KIT.parts.length && allJoined()) setTimeout(finish, 900); }
+const allJoined = () => KIT.modules.every(m => MOD[m].joined) &&
+  (!KIT.bridgeLock || !bridgeState || KIT.bridgeLock.states[bridgeStateName()].loose.every(q=>!placed.has(q)));
+function checkDone() { if (placed.size === KIT.parts.length && allJoined()) setTimeout(()=>{if(placed.size===KIT?.parts.length && allJoined())finish();},900); }
 
 // ---------- 원판 (같은 모양은 한 조각 + 남은 개수)
 function partSVG(p, scale) {
@@ -1101,6 +1162,7 @@ function refresh() {
   });
   $("bar").style.width = (100 * placed.size / KIT.parts.length) + "%";
   $("s-miss").textContent = stats.miss; $("s-hint").textContent = stats.hint;
+  syncBridgeState();
 }
 
 // ---------- 규칙: 기본은 곧은 길 + 막는 덩어리 들기. 새 키트만 rules.support로 실제 받침 선행 조건을 명시.
@@ -1185,11 +1247,11 @@ function takeOut(id, x, y) {                                       // 놓인 판
     return;
   }
   const s = slots[id], t = liftAround(p, 0, 420), h = homeOf(id);
-  stopMotion(); settle(s.mesh); placed.delete(id);
+  stopMotion(); settle(s.mesh); placed.delete(id); $("done").hidden=true; controls.autoRotate=false;
   const floor = boxOf(s, offOf(s.module)).min.y, vertical = KIT.dirs[p.k][1];
   const travel = vertical < -1e-8 ? Math.min(90, Math.max(0, floor / -vertical)) : 90;
   tween(s.mesh, h, h.clone().addScaledVector(s.local[p.k], travel), t, 380); sfx("out", t);
-  setTimeout(() => { if (!placed.has(id)) { s.mesh.visible = false; s.ghost.visible = true; } }, t + 400);
+  setTimeout(() => { if (!placed.has(id)) { s.mesh.visible = false; s.ghost.visible = true; syncBridgeState(); } }, t + 400);
   refresh();
 }
 
@@ -1203,6 +1265,7 @@ let overT = 0; renderer.domElement.addEventListener("pointermove", e => {       
 renderer.domElement.addEventListener("pointerup", e => {
   if (mapOn) { if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) <= 6) { const v = mapHit(e); if (v) { stopPeek(); switchKit(v.kit); } } down = null; return; }   // 마을: 건물 누르기 = 그 키트로
   if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6 || !KIT) return; down = null;
+  if (bridgeState?.busy) return;
   if (demo) return stopDemo();                                                                // 자동 조립 중 누르기 = 멈춤 (돌려 보기는 그대로)
   const r = renderer.domElement.getBoundingClientRect();
   ptr.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
@@ -1338,7 +1401,7 @@ function finish() {
 }
 function reset() {
   $("live").textContent = "";
-  stopMotion(); clearOuts(); placed.clear(); selected = null; stats = { miss: 0, hint: 0 }; clearInterval(timer); started = 0; demoRun = false;
+  stopMotion(); clearOuts(); placed.clear(); bridgeState=newBridgeState(); selected = null; stats = { miss: 0, hint: 0 }; clearInterval(timer); started = 0; demoRun = false;
   for (const m of KIT.modules) MOD[m].joined = m === KIT.base;                                // 덩어리는 다시 탁자 위 제자리로
   for (const s of Object.values(slots)) { s.mesh.visible = false; s.ghost.visible = true; }
   poseAll(); flights.length = 0; controls.autoRotate = false; $("done").hidden = true; $("s-time").textContent = "0:00"; refresh();
@@ -1433,7 +1496,9 @@ let svgNext = 0;
     f.mesh.position.lerpVectors(f.from, f.to, e); if (k >= 1) flights.splice(i, 1); else i++;
   }
   if (pulse) { const k = (now - pulse.t0) / 1400; pulseMat.opacity = k < 1 ? 0.55 * Math.sin(Math.PI * k) : 0; if (k >= 1) { scene.remove(pulse.m); pulse = null; } }
+  if (bridgeState?.needsSync && !flights.length) syncBridgeState();
   if (motion) stepMotion(now);
+  bridgeButton();
   if (drops.length) stepDrops(now);
   updateBand(); updateBought(); updateBucket(); updateCords();
   controls.update(); const man = M.built && !$("manual").hidden; if (man) M.controls.update();
