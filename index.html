@@ -54,7 +54,7 @@ body { background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, sans-
 .hud { position: absolute; top: 12px; left: 12px; right: 12px; display: flex; flex-wrap: wrap; gap: 8px; row-gap: 6px; align-items: center; pointer-events: none; }   /* 넓지 않으면 도구가 다음 줄로 */
 .chip { display: inline-flex; gap: 5px; align-items: center; font: 500 13px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
 .chip svg { width: 15px; height: 15px; }
-.tools { margin-left: auto; display: flex; gap: 6px; pointer-events: auto; }
+.tools { margin-left: auto; display: flex; flex-wrap: wrap; justify-content: flex-end; max-width: 100%; gap: 6px; pointer-events: auto; }
 .kits { display: flex; gap: 4px; padding: 3px; border-radius: 22px; min-width: 0; max-width: 100%; overflow-x: auto; scrollbar-width: none; background: color-mix(in srgb, var(--ink) 7%, transparent); pointer-events: auto; margin-right: 4px; }
 .kits .icon { width: 34px; height: 34px; border-color: transparent; background: none; }
 .kits .icon[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
@@ -62,6 +62,8 @@ body { background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, sans-
 .icon { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 19px; border: 1px solid var(--line); background: color-mix(in srgb, var(--bg) 85%, transparent); color: var(--ink); cursor: pointer; padding: 0; }
 .icon svg { width: 18px; height: 18px; }
 #b-bridge[hidden] { display: none; }
+#b-cycle[hidden] { display: none; }
+.tools .icon.operate { width: auto; padding: 0 10px; display: flex; gap: 4px; font: 600 12px system-ui,sans-serif; }
 .icon[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
 .icon .spd { font: 700 12px/1 system-ui, sans-serif; letter-spacing: -0.02em; }
 .icon:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -202,6 +204,7 @@ body { background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, sans-
         <button type="button" class="icon" id="b-hint" title="힌트" aria-label="힌트"><svg><use href="#i-bulb"/></svg></button>
         <button type="button" class="icon" id="b-play" title="자동 조립" aria-label="자동 조립" aria-pressed="false"><svg><use href="#i-play"/></svg></button>
         <button type="button" class="icon" id="b-speed" title="자동 조립 빠르기 1배" aria-label="자동 조립 빠르기 1배"><span class="spd">1×</span></button>
+        <button type="button" class="icon operate" id="b-cycle" hidden title="도개교 작동" aria-label="도개교 작동" aria-pressed="false"><svg><use href="#i-play"/></svg><span>작동</span></button>
         <button type="button" class="icon" id="b-bridge" hidden title="도개교 올리기" aria-label="도개교 올리기"><svg viewBox="0 0 24 24"><path d="M3 20h18M5 18V8m0 10L17 6m-4 0h4v4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
         <button type="button" class="icon" id="b-rot" title="완성 후 돌기" aria-label="완성 후 돌기" aria-pressed="true"><svg><use href="#i-spin"/></svg></button>
         <button type="button" class="icon" id="b-skip" title="완성 보기" aria-label="완성 보기"><svg><use href="#i-skip"/></svg></button>
@@ -229,7 +232,7 @@ body { background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, sans-
 
 <script>
 const $ = id => document.getElementById(id);
-const DATA_V = "43-architecture";                                                    // 키트 자료 판 (바꿔 올릴 때 올림: 브라우저에 남은 옛 자료와 섞이지 않게)
+const DATA_V = "44-cycle";                                                    // 키트 자료 판 (바꿔 올릴 때 올림: 브라우저에 남은 옛 자료와 섞이지 않게)
 const cssColor = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 let KIT, slots = {}, placed = new Set(), selected = null, stats = { miss: 0, hint: 0 }, timer = null, started = 0;
 
@@ -311,12 +314,22 @@ $("b-sound").addEventListener("click", () => setSound(!SND.on)); setSound(SND.on
 // ---------- 다 지으면 움직임: 풍차 날개는 축째로 돌고, 수레는 바퀴째로 앞뒤로 굴러감 (각 = 간 거리 / 반지름). 무엇이든 만지면 멈추고 제자리
 // A bridge's assembly pieces retain their current physical configuration.
 // The handle moves the bridge only; keys use the ordinary pick/place/remove UI.
-let bridgeState = null;
+let bridgeState = null, bridgeCycle = null;
 function newBridgeState() { return KIT?.bridgeLock ? { raised:false,barWork:false,pinWork:false,busy:false,needsSync:false } : null; }
 function bridgeStateName() { return `${+bridgeState.raised}:${+bridgeState.barWork}:${+bridgeState.pinWork}`; }
 function bridgeButton() {
   const b=$("b-bridge"),l=KIT?.bridgeLock;
   b.hidden=!l || mapOn;
+  const run=$("b-cycle"),complete=!!l && !!bridgeState && placed.size===KIT.plates && allJoined();
+  run.hidden=!l || mapOn || (!complete&&!bridgeCycle);
+  run.disabled=!bridgeCycle && (!complete || bridgeState?.busy || flights.length>0);
+  const running=bridgeCycle&&!bridgeCycle.paused;
+  const title=bridgeCycle?(running?"작동 멈춤":"작동 계속"):"도개교 작동";
+  if(run.title!==title){
+    run.title=title;run.setAttribute("aria-label",title);run.setAttribute("aria-pressed",String(!!running));
+    run.querySelector("span").textContent=bridgeCycle?(running?"멈춤":"계속"):"작동";
+    run.querySelector("use").setAttribute("href",running?"#i-stop":"#i-play");
+  }
   if (!l || !bridgeState) return;
   b.disabled=bridgeState.busy || flights.length>0 || !MOD.bridge?.joined ||
     [...l.parts,...l.supports].some(q=>!placed.has(q));
@@ -354,10 +367,10 @@ function moveBridge() {
   const hit=l.states[bridgeStateName()].blockers.filter(q=>placed.has(q));
   if (hit.length) {flash(hit);sfx("wait");return;}
   stopDemo();stopMotion();controls.autoRotate=false;bridgeState.busy=true;const operation=bridgeState;bridgeButton();
-  const opening=!bridgeState.raised,start=performance.now(),from=bridgeState.raised?l.angle:0,to=opening?l.angle:0;
+  const opening=!bridgeState.raised,start=performance.now(),from=bridgeState.raised?l.angle:0,to=opening?l.angle:0,duration=bridgeCycle?700/SPEED:700;
   const frame=now=>{
     if (!KIT?.bridgeLock || bridgeState!==operation) return;
-    const t=Math.min(1,(now-start)/700),e=t*t*(3-2*t),angle=(from+(to-from)*e)*Math.PI/180;
+    const t=Math.min(1,(now-start)/duration),e=t*t*(3-2*t),angle=(from+(to-from)*e)*Math.PI/180;
     const S=turnAbout(new THREE.Vector3(...l.pivot),new THREE.Vector3(...l.axis),angle);
     for (const q of l.parts) bridgePose(slots[q],S.clone().multiply(slots[q].restBase));
     if (t<1) return requestAnimationFrame(frame);
@@ -365,7 +378,71 @@ function moveBridge() {
   };
   requestAnimationFrame(frame);
 }
-$("b-bridge").addEventListener("click",moveBridge);
+$("b-bridge").addEventListener("click",()=>{stopBridgeCycle();moveBridge();});
+function stopBridgeCycle() {
+  if (!bridgeCycle) return;
+  bridgeCycle=null;selected=null;if(!demo)setPlay(false);if(KIT){refresh();checkDone();}
+}
+function toggleBridgeCycle() {
+  if (!bridgeCycle) return startBridgeCycle();
+  const c=bridgeCycle,now=performance.now();
+  c.paused=!c.paused;
+  if(c.paused)c.pausedAt=now;
+  else if(c.until)c.until+=now-c.pausedAt;
+  setPlay(!c.paused);bridgeButton();
+}
+function startBridgeCycle() {
+  const l=KIT?.bridgeLock;
+  if(!l||!bridgeState||placed.size!==KIT.plates||!allJoined()||bridgeState.busy||flights.length)return false;
+  stopDemo();stopMotion();controls.autoRotate=false;selected=null;
+  const q=[],remove=id=>q.push({kind:'remove',id}),insert=id=>q.push({kind:'insert',id});
+  if(bridgeState.raised){
+    if(bridgeState.barWork){remove(l.keeper);remove(l.bar);}
+    q.push({kind:'lower'});
+    if(bridgeState.barWork){insert(l.bar);insert(l.keeper);}
+  }
+  q.push({kind:'raise'});remove(l.keeper);remove(l.bar);insert(l.bar);insert(l.keeper);
+  q.push({kind:'hold'});remove(l.keeper);remove(l.bar);q.push({kind:'lower'});insert(l.bar);insert(l.keeper);
+  bridgeCycle={owner:KIT,pose:bridgeState,q,paused:false,settling:false,until:0,phase:'ready'};
+  // Frame the mechanism in both end poses; portrait screens need a wider
+  // camera distance so the parking rack and locking pin remain in view.
+  const box=new THREE.Box3();
+  for(const name of ['0:0:0','1:1:1'])for(const q of [...l.parts,l.bar,l.keeper]){
+    const s=slots[q];s.mesh.geometry.computeBoundingBox();
+    const M=l.states[name].transforms[q]?new THREE.Matrix4().set(...l.states[name].transforms[q]):new THREE.Matrix4();
+    box.union(s.mesh.geometry.boundingBox.clone().applyMatrix4(M.multiply(s.restBase)));
+  }
+  box.expandByScalar(8);
+  const center=box.getCenter(new THREE.Vector3()),vf=THREE.MathUtils.degToRad(camera.fov/2),hf=Math.atan(Math.tan(vf)*camera.aspect);
+  const distance=box.getSize(new THREE.Vector3()).length()/2/Math.sin(Math.min(vf,hf))*1.08;
+  controls.target.copy(center);camera.position.copy(center).addScaledVector(new THREE.Vector3(.55,.3,.8).normalize(),distance);controls.update();
+  setPlay(true);bridgeButton();return true;
+}
+function stepBridgeCycle(now) {
+  const c=bridgeCycle;if(!c||c.paused)return;
+  if(c.owner!==KIT||c.pose!==bridgeState){stopBridgeCycle();return;}
+  const l=KIT.bridgeLock;
+  if(bridgeState.busy||flights.length||bridgeState.needsSync||[l.bar,l.keeper].some(q=>!placed.has(q)&&slots[q].mesh.visible))return;
+  if(c.settling){
+    if(!c.until)c.until=now+Math.max(100,250/SPEED);
+    if(now<c.until)return;
+    c.settling=false;c.until=0;
+  }
+  if(!c.q.length){bridgeCycle=null;selected=null;setPlay(false);refresh();finish();return;}
+  const a=c.q.shift();c.phase=a.kind;
+  if(a.kind==='hold'){c.settling=true;c.until=now+Math.max(900,1800/SPEED);return;}
+  if(a.kind==='raise'||a.kind==='lower'){
+    const raised=a.kind==='raise';if(bridgeState.raised===raised)return;
+    moveBridge();if(!bridgeState.busy){console.error('Bridge playback obstructed',a.kind);stopBridgeCycle();return;}
+  }else{
+    if(placed.has(a.id)===(a.kind==='insert'))return;
+    const p=plan(a.id);
+    if(p.blockers||p.lift){console.error('Bridge playback obstructed',a.id,p);stopBridgeCycle();return;}
+    if(a.kind==='remove')takeOut(a.id,0,0);else place(a.id,p);
+  }
+  c.settling=true;
+}
+$("b-cycle").addEventListener("click",toggleBridgeCycle);
 let motion = null;
 function startMotion() {
   if (KIT?.bridgeLock) { syncBridgeState(); return; }
@@ -970,7 +1047,7 @@ function mapHit(e) {
 let kitId = null, kitRoot = null;
 function unloadKit() {
   if (!KIT) return;
-  stopDemo(); stopMotion();
+  stopBridgeCycle(); stopDemo(); stopMotion();
   clearOuts(); clearInterval(timer); timer = null; started = 0; flights.length = 0; placed.clear(); selected = null;
   if (pulse) { scene.remove(pulse.m); pulse = null; }
   scene.remove(kitRoot); kitRoot = null;
@@ -1143,7 +1220,7 @@ function placeButtons() {                                             // 덩어�
 }
 const allJoined = () => KIT.modules.every(m => MOD[m].joined) &&
   (!KIT.bridgeLock || !bridgeState || KIT.bridgeLock.states[bridgeStateName()].loose.every(q=>!placed.has(q)));
-function checkDone() { if (placed.size === KIT.parts.length && allJoined()) setTimeout(()=>{if(placed.size===KIT?.parts.length && allJoined())finish();},900); }
+function checkDone() { if (!bridgeCycle && placed.size === KIT.parts.length && allJoined()) setTimeout(()=>{if(!bridgeCycle && placed.size===KIT?.parts.length && allJoined())finish();},900); }
 
 // ---------- 원판 (같은 모양은 한 조각 + 남은 개수)
 function partSVG(p, scale) {
@@ -1161,7 +1238,7 @@ function buildSheet() {
     const p = slots[KIT.groups[sh][0]];
     return `<button type="button" class="part" data-shape="${sh}" aria-pressed="false" aria-label="판 ${Math.round(p.size[0])}×${Math.round(p.size[1])} mm">${partSVG(p, scale)}<span class="n"></span></button>`;
   }).join("");
-  document.querySelectorAll(".part").forEach(b => b.addEventListener("click", () => { stopDemo(); selected = selected === b.dataset.shape ? null : b.dataset.shape; sfx("tick"); refresh(); }));
+  document.querySelectorAll(".part").forEach(b => b.addEventListener("click", () => { stopBridgeCycle(); stopDemo(); selected = selected === b.dataset.shape ? null : b.dataset.shape; sfx("tick"); refresh(); }));
 }
 function refresh() {
   document.querySelectorAll(".part").forEach(b => {
@@ -1228,7 +1305,7 @@ function miss(x, y, kind) {
   stats.miss++; refresh(); mark(x, y, kind);
   const b = document.querySelector(`.part[data-shape="${selected}"]`); if (b) { b.classList.remove("shake"); void b.offsetWidth; b.classList.add("shake"); }
 }
-function tween(mesh, from, to, delay, dur) { const k = demo ? SPEED : 1; flights.push({ mesh, from: from.clone(), to: to.clone(), t0: performance.now() + delay / k, dur: dur / k }); }
+function tween(mesh, from, to, delay, dur) { const k = (demo || bridgeCycle) ? SPEED : 1; flights.push({ mesh, from: from.clone(), to: to.clone(), t0: performance.now() + delay / k, dur: dur / k }); }
 function settle(mesh) { for (let i = flights.length - 1; i >= 0; i--) if (flights[i].mesh === mesh) flights.splice(i, 1); }   // 빠르게 연달아 누르면 앞 움직임을 버림
 function liftAround(p, t0, hold) {                                 // 막는 덩어리: 들었다가 (hold 뒤에) 내림
   if (!p.lift) return 0;
@@ -1259,7 +1336,8 @@ function takeOut(id, x, y) {                                       // 놓인 판
   const floor = boxOf(s, offOf(s.module)).min.y, vertical = KIT.dirs[p.k][1];
   const travel = vertical < -1e-8 ? Math.min(90, Math.max(0, floor / -vertical)) : 90;
   tween(s.mesh, h, h.clone().addScaledVector(s.local[p.k], travel), t, 380); sfx("out", t);
-  setTimeout(() => { if (!placed.has(id)) { s.mesh.visible = false; s.ghost.visible = true; syncBridgeState(); } }, t + 400);
+  const owner=KIT,pose=bridgeState,speed=(demo||bridgeCycle)?SPEED:1;
+  setTimeout(() => { if(KIT!==owner||bridgeState!==pose)return; if (!placed.has(id)) { s.mesh.visible = false; s.ghost.visible = true; syncBridgeState(); } }, (t + 400)/speed);
   refresh();
 }
 
@@ -1273,6 +1351,7 @@ let overT = 0; renderer.domElement.addEventListener("pointermove", e => {       
 renderer.domElement.addEventListener("pointerup", e => {
   if (mapOn) { if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) <= 6) { const v = mapHit(e); if (v) { stopPeek(); switchKit(v.kit); } } down = null; return; }   // 마을: 건물 누르기 = 그 키트로
   if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6 || !KIT) return; down = null;
+  if (bridgeCycle) return stopBridgeCycle();
   if (bridgeState?.busy) return;
   if (demo) return stopDemo();                                                                // 자동 조립 중 누르기 = 멈춤 (돌려 보기는 그대로)
   const r = renderer.domElement.getBoundingClientRect();
@@ -1413,7 +1492,7 @@ function finish() {
 }
 function reset() {
   $("live").textContent = "";
-  stopMotion(); clearOuts(); placed.clear(); bridgeState=newBridgeState(); selected = null; stats = { miss: 0, hint: 0 }; clearInterval(timer); started = 0; demoRun = false;
+  stopBridgeCycle(); stopMotion(); clearOuts(); placed.clear(); bridgeState=newBridgeState(); selected = null; stats = { miss: 0, hint: 0 }; clearInterval(timer); started = 0; demoRun = false;
   for (const m of KIT.modules) MOD[m].joined = m === KIT.base;                                // 덩어리는 다시 탁자 위 제자리로
   for (const s of Object.values(slots)) { s.mesh.visible = false; s.ghost.visible = true; }
   poseAll(); flights.length = 0; controls.autoRotate = false; $("done").hidden = true; $("s-time").textContent = "0:00"; refresh();
@@ -1473,7 +1552,10 @@ function demoQueue() {                                                 // 마른
 function demoStep() {
   if (!demo) return;
   const q = demo.q;
-  if (!q.length) return stopDemo();
+  if (!q.length) {
+    if(KIT.bridgeLock&&(flights.length||bridgeState.busy||bridgeState.needsSync)){demo.t=setTimeout(demoStep,50);return;}
+    const cycle=!!KIT.bridgeLock;stopDemo();if(cycle)startBridgeCycle();return;
+  }
   if (q[0][0] === "@") {                                                                        // 덩어리 하나 끝 -> 합치기
     const m = q.shift().slice(1);
     join(m); if (!MOD[m].joined) return stopDemo();
@@ -1490,7 +1572,7 @@ function demoStep() {
   place(id, p);
   demo.t = setTimeout(demoStep, (p.lift ? 1150 : 700) / SPEED);
 }
-playBtn.addEventListener("click", () => mapOn ? (mapPeek ? stopPeek() : peekVillage()) : demo ? stopDemo() : startDemo());
+playBtn.addEventListener("click", () => mapOn ? (mapPeek ? stopPeek() : peekVillage()) : bridgeCycle ? toggleBridgeCycle() : demo ? stopDemo() : startDemo());
 function showDone() {                                                  // 완성 보기 (누를 때만): 자동 조립과 같은 순서를 움직임 없이 한 번에 -> 바로 완성 (움직임·소리)
   if (!KIT) return;
   stopDemo(); $("manual").hidden = true; reset(); demoRun = true;
@@ -1509,6 +1591,7 @@ let svgNext = 0;
   }
   if (pulse) { const k = (now - pulse.t0) / 1400; pulseMat.opacity = k < 1 ? 0.55 * Math.sin(Math.PI * k) : 0; if (k >= 1) { scene.remove(pulse.m); pulse = null; } }
   if (bridgeState?.needsSync && !flights.length) syncBridgeState();
+  stepBridgeCycle(now);
   if (motion) stepMotion(now);
   bridgeButton();
   if (drops.length) stepDrops(now);
