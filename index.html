@@ -239,7 +239,7 @@ body { background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, sans-
 
 <script>
 const $ = id => document.getElementById(id);
-const DATA_V = "46-mixed-stock";                                                    // 키트 자료 판 (바꿔 올릴 때 올림: 브라우저에 남은 옛 자료와 섞이지 않게)
+const DATA_V = "47-village";                                                    // 키트 자료 판 (바꿔 올릴 때 올림: 브라우저에 남은 옛 자료와 섞이지 않게)
 const cssColor = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 let KIT, slots = {}, placed = new Set(), selected = null, stats = { miss: 0, hint: 0 }, timer = null, started = 0;
 
@@ -740,41 +740,83 @@ const KITS = [{ id: "railway_terminal", name: "대시계 철도역" }, { id: "co
 // ---------- 마을 (키트 줄 맨 앞 칸): 판 바닥 위 제자리에 지은 건물이 서고, 안 지은 자리는 흐린 실루엣. 건물을 누르면 그 키트를 조립대에.
 // 다 지으면 (완성) 마을에 섬. 자동 조립 단추 = 안 지은 건물을 판 하나씩 위에서 내려 끼워 보여 줌 (기록 안 함)
 const rnd = seed => () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };   // 씨앗 난수 (나무·배치)
-const VILLAGE = { x0: -410, x1: 990, z0: -570, z1: 410, square: 250, slots: [                   // 자리 (mm, glTF: x = 화면 오른쪽 앞, z = 왼쪽 앞) + 앞 (glTF +Z) 방향 (0 +Z, 1 +X, 2 -Z, 3 -X)
-  // 대성당 북쪽 뜰: 주거 구역 뒤, 정문은 남쪽 연결 길을 봄
-  { kit: "cathedral", x: 540, z: -450, rot: 0 },
-  { kit: "citadel", x: 820, z: -450, rot: 0 },
-  // 장터 광장 (refs/map_market/map.png 배치)
-  { kit: "market_tower", x: -125, z: -125, rot: 0 }, { kit: "chapel", x: 15, z: -178, rot: 0 }, { kit: "smithy", x: 135, z: -150, rot: 0 },
-  { kit: "bakery", x: -190, z: 10, rot: 1 }, { kit: "inn", x: -150, z: 160, rot: 1 }, { kit: "townhouse", x: 160, z: 55, rot: 0 },
-  { kit: "market_well", x: 0, z: 0, rot: 0 }, { kit: "stall", x: -85, z: 15, rot: 0 }, { kit: "stall", x: 10, z: -80, rot: 0 },
-  // 바깥 둘레: 마을 문 (앞 담), 회관 (뒤), 헛간·벽돌 집 (오른쪽), 목조 집 (앞 골목), 언덕 풍차 (왼쪽 둘레, 시계탑에 가리지 않게)
-  { kit: "gatehouse", x: 110, z: 380, rot: 0 }, { kit: "market_hall", x: 40, z: -332, rot: 0 }, { kit: "barn", x: 330, z: -300, rot: 0 },
-  { kit: "house_a", x: 322, z: 58, rot: 0 }, { kit: "house_b", x: -150, z: 330, rot: 0 }, { kit: "tower_mill", x: -340, z: -175, rot: 0 }],
-  roads: [[22, [[820, -360], [820, -310], [700, -310]]], [22, [[540, -377], [540, -310], [700, -310]]], [40, [[250, -150], [1000, -150]]], [40, [[322, 150], [1000, 150]]], [24, [[700, -420], [700, 420]]],   // 대성당 기단 앞에서 만나는 길 + 주거 구역 큰길 둘
-          [36, [[110, 420], [110, 240]]], [22, [[-150, 368], [-150, 390], [92, 390]]], [24, [[40, -300], [40, -240]]],
-          [22, [[330, -252], [330, -212], [240, -212]]], [22, [[322, 92], [322, 150], [240, 150]]], [16, [[-340, -140], [-300, -95], [-245, -95]]]],
-  pond: [-320, 140, 46],
-  nature: [["oak", -225, -110, 1.0], ["oak", -222, 84, 0.85], ["pine", 66, -218, 0.9], ["oak", 150, 185, 1.1], ["pine", 215, -60, 0.8],
-           ["bush", -60, 210, 1.0], ["bush", 90, 205, 0.8], ["rock", 60, 215, 1.0], ["bush", 222, 120, 0.9], ["rock", -220, -30, 0.8],
-           // 과수원 (왼쪽 둘레), 풍차 언덕, 뒤 숲, 오른쪽 앞 숲, 연못가
-           ["oak", -360, -40, 0.75, 1], ["oak", -305, -40, 0.7, 1], ["oak", -360, 25, 0.75, 1], ["oak", -305, 25, 0.72, 1], ["oak", -330, -275, 0.8, 1], ["oak", -270, -330, 0.75, 1],
-           ["pine", -380, -390, 1.0], ["pine", -230, -385, 0.85], ["pine", -150, -380, 1.1], ["oak", -90, -330, 0.9], ["pine", 150, -385, 0.9], ["oak", 200, -330, 0.85],
-           ["pine", 385, -385, 0.8], ["pine", 385, -90, 1.0], ["oak", 380, 230, 1.0], ["pine", 320, 300, 1.1], ["oak", 250, 360, 0.95],
-           ["pine", 385, 385, 0.85], ["oak", 200, 300, 0.8], ["oak", -385, 270, 0.9], ["pine", -380, 380, 1.0], ["oak", -260, 385, 0.8],
-           ["bush", -270, 120, 0.8], ["bush", -360, 210, 0.7], ["rock", -280, 175, 0.9], ["rock", -365, 110, 0.7], ["bush", -250, -250, 0.9], ["rock", -270, -300, 1.1],
-           ["bush", 250, -260, 0.8], ["bush", 255, 245, 1.0], ["bush", -255, 250, 0.9], ["bush", 60, 300, 0.8], ["rock", 170, 330, 0.8], ["bush", -30, 330, 0.9],
-           ["bush", 380, 20, 0.8], ["rock", 260, -110, 0.8], ["bush", -60, -290, 0.8], ["bush", 120, -290, 0.7]] };
-// 주거 구역 (생성기 집 gh01-gh24): 큰길 둘을 따라 네 줄, 줄마다 여섯 채. 앞 (glTF +Z) 이 길을 봄. 가운데는 풀밭 띠, 뒤는 뜰
-{ const xs = [470, 560, 650, 750, 840, 930]; let k = 1;
-  for (const [z, rot] of [[-205, 0], [-95, 2], [95, 0], [205, 2]]) for (const x of xs) VILLAGE.slots.push({ kit: `gh${String(k++).padStart(2, "0")}`, x, z, rot, name: "집" });
-  const R = rnd(97);
-  for (const x of [520, 610, 800, 890]) for (const z of [-30, 30]) VILLAGE.nature.push([R() < 0.6 ? "oak" : "pine", x + (R() - 0.5) * 20, z, 0.7 + R() * 0.3]);
-  for (const x of [470, 560, 650, 750, 840, 930, 980]) for (const z of [-300, -370, 300, 370]) if (R() < 0.7) VILLAGE.nature.push([["oak", "pine", "bush", "bush", "rock"][Math.floor(R() * 5)], x + (R() - 0.5) * 40, z + (R() - 0.5) * 30, 0.6 + R() * 0.4]);
-  for (const x of [700]) for (const z of [-30, 30]) VILLAGE.nature.push(["bush", x + 30, z, 0.8]); }
-// 대성당 기단과 정문 진입로 주변은 나무 수관까지 비운 뜰로 둔다.
-VILLAGE.nature = VILLAGE.nature.filter(([, x, z]) => !(x > 485 && x < 595 && z > -540 && z < -340));
-VILLAGE.nature = VILLAGE.nature.filter(([, x, z]) => !(x > 720 && x < 930 && z > -555 && z < -325));
+const VILLAGE = { x0:-410, x1:990, z0:-570, z1:410, slots:[
+  // The market is an old, irregular village; the eastern lanes are its planned extension.
+  {kit:"cathedral",x:540,z:-450,rot:0}, {kit:"citadel",x:820,z:-450,rot:0},
+  {kit:"market_tower",x:-125,z:-145,rot:0}, {kit:"chapel",x:35,z:-178,rot:0},
+  {kit:"smithy",x:175,z:-145,rot:0}, {kit:"bakery",x:-195,z:10,rot:1},
+  {kit:"inn",x:-160,z:165,rot:1}, {kit:"townhouse",x:180,z:80,rot:3},
+  {kit:"market_well",x:0,z:0,rot:0}, {kit:"stall",x:-77,z:-35,rot:0},
+  {kit:"stall",x:50,z:-68,rot:0}, {kit:"gatehouse",x:110,z:370,rot:0},
+  {kit:"market_hall",x:-10,z:-335,rot:0}, {kit:"barn",x:320,z:-325,rot:0},
+  {kit:"house_a",x:320,z:72,rot:3}, {kit:"house_b",x:-155,z:315,rot:2},
+  {kit:"tower_mill",x:-335,z:-190,rot:0}],
+  // Width, centreline, surface. Forecourts meet the existing building bases.
+  roads:[
+    [28,[[110,410],[110,300],[115,235],[95,160],[65,110]]],
+    [14,[[105,20],[265,20],[350,0],[700,0],[978,0]]],
+    [28,[[245,-150],[430,-150],[700,-150],[990,-150]]],
+    [28,[[245,150],[430,150],[700,150],[990,150]]],
+    [24,[[700,-310],[700,-150],[700,0],[700,150],[700,285],[700,410]]],
+    [22,[[245,-150],[270,-235],[320,-260],[382,-260],[382,-290],[435,-310],[900,-310]]],
+    [18,[[110,-35],[110,-225],[100,-265]]],
+    [18,[[110,-35],[235,-55],[245,-150]]],
+    [22,[[115,235],[200,200],[245,150]]],
+    [18,[[-10,-300],[-10,-265],[210,-265],[320,-260]]],
+    [16,[[540,-384.75],[540,-310]]], [16,[[820,-360],[820,-310]]],
+    [12,[[320,-282],[320,-260]]],
+    [16,[[-335,-164],[-310,-125],[-220,-95],[-190,-65],[-123,-66]]],
+    [18,[[-155,275],[-155,250],[-65,250],[15,200],[65,110]]],
+    [12,[[-225,90],[-265,85],[-305,70],[-360,85],[-380,145],[-355,205],[-285,215],[-245,175],[-220,100],[-225,90]],"trail"],
+    [12,[[-305,70],[-310,0],[-325,-75],[-335,-164]],"trail"],
+    [12,[[-310,-125],[-265,-125],[-265,-275],[-310,-350],[-325,-435],[-255,-490],[-110,-490],[40,-470],[155,-430],[210,-365],[210,-265]],"trail"],
+    [12,[[430,285],[700,285],[955,285]],"trail"],
+    [10,[[430,150],[420,235],[430,285],[430,365],[580,385],[700,370],[820,385],[955,365],[955,285],[970,230],[970,175],[978,150]],"trail"],
+    // Door paths in the old town, narrower than the public lanes.
+    [12,[[-125,-85],[-125,-65],[-90,-60]]], [12,[[35,-136],[35,-115],[-10,-105],[-20,-85]]],
+    [12,[[175,-114],[175,-60],[110,-35]]], [12,[[-159,10],[-120,10]]],
+    [12,[[-118,165],[-50,165],[-15,115]]], [10,[[147,80],[125,80],[110,60]]],
+    [10,[[291,72],[275,72],[265,20]]]],
+  plazas:[
+    [[-123,-66],[-55,-105],[75,-98],[113,-58],[125,55],[90,115],[-93,115],[-125,65]],
+    [[485,-385],[595,-385],[595,-337],[485,-337]],
+    [[780,-360],[860,-360],[860,-326],[780,-326]]],
+  pond:[-320,145,44], nature:[], props:[], planted:[], placedProps:[],
+  greens:[[-265,-466,112,67],[15,-495,153,43],[-329,10,60,73],[-343,273,45,81],
+          [550,-35,115,22],[550,35,115,22],[845,-35,110,22],[845,35,110,22],
+          [550,342,100,39],[850,342,95,39]],
+  wallGaps:{north:[],south:[[110,38],[700,20]],west:[],east:[[-150,23],[0,20],[150,23]],
+            inner:[[-295,32],[-150,23],[0,34],[150,23],[285,19]]}
+};
+{
+  const xs=[460,550,640,750,835,925], zs=[[-208,-212,-204,-210,-207,-215],[-92,-87,-94,-90,-88,-91],
+      [93,91,92,94,90,95],[210,205,207,215,208,211]];
+  let k=1;
+  for(let row=0;row<4;row++)for(let col=0;col<6;col++){
+    const x=xs[col]+[0,-3,3,0,2,-2][col]*(row%2?1:-1),z=zs[row][col],rot=row%2?2:0;
+    const kit=`gh${String(k++).padStart(2,"0")}`;
+    VILLAGE.slots.push({kit,x,z,rot,name:"집"});
+    // The exact doorstep is filled in from the loaded geometry, not a nominal house size.
+  }
+  const R=rnd(2803),put=(kind,x,z,k)=>VILLAGE.nature.push([kind,x,z,k]);
+  for(const [cx,cz,rx,rz,n] of [[-280,-480,108,62,36],[-52,-500,133,37,27],[190,-487,143,55,26],
+        [-325,-328,63,57,15],[355,-495,53,50,9]])
+    for(let i=0;i<n;i++){const a=R()*Math.PI*2,r=Math.sqrt(R());put(R()<.52?"pine":"oak",cx+Math.cos(a)*rx*r,cz+Math.sin(a)*rz*r,.76+R()*.37);}
+  for(const x of [-367,-303])for(const z of [-55,8,68])put("oak",x+(R()-.5)*8,z+(R()-.5)*8,.68+R()*.07);
+  for(const [x,z,k] of [[-375,245,.85],[-350,325,.83],[-277,340,.76],[-230,377,.63],[-40,345,.67],[0,300,.7],[220,315,.73],[315,350,.77]])put("oak",x,z,k);
+  for(const x of [460,550,640,755,840,932])for(const z of [-35,35])put("oak",x+(R()-.5)*8,z,.59+R()*.08);
+  for(const x of [470,565,650,750,842,935]){put("oak",x,-274,.66);put("bush",x+27,-278,.76);}
+  for(const x of [465,525,585,645,755,815,875,935])for(const z of [325,367])put("oak",x+(R()-.5)*8,z+(R()-.5)*6,.49+R()*.08);
+  for(const [x,z] of [[-230,-55],[-222,80],[125,197],[230,-50],[235,83],[255,235],[-50,210],[-80,-275],[-210,-285],[420,-390],[630,-395],[925,-405]])put("oak",x,z,.66+R()*.15);
+  for(let i=0;i<110;i++){
+    const x=VILLAGE.x0+24+R()*(VILLAGE.x1-VILLAGE.x0-48),z=VILLAGE.z0+25+R()*(VILLAGE.z1-VILLAGE.z0-50);
+    put(R()<.76?"bush":"rock",x,z,.55+R()*.36);
+  }
+  for(const [x,z,rot] of [[-91,105,0],[105,-27,1],[-283,190,1],[-366,110,3],[508,23,2],[595,-23,0],[797,23,2],[890,-23,0],[515,-343,2],[850,-333,2],[620,301,0],[820,302,0]])VILLAGE.props.push(["bench",x,z,rot]);
+  for(const [x,z] of [[90,285],[94,204],[134,36],[264,-133],[430,-129],[690,-128],[972,-128],[430,129],[690,128],[972,128],[432,-292],[708,-292],[891,-292]])VILLAGE.props.push(["lamp",x,z,0]);
+  for(const [x,z,rot] of [[130,280,0],[275,0,1],[-291,-128,2],[697,263,0]])VILLAGE.props.push(["sign",x,z,rot]);
+  for(const [x,z,rot] of [[91,322,0],[129,322,0],[-100,92,0],[97,94,0],[446,22,1],[446,-22,1],[949,22,1],[949,-22,1]])VILLAGE.props.push(["planter",x,z,rot]);
+}
 const VKITS = new Set(VILLAGE.slots.map(v => v.kit));
 const BUILT = new Set(); try { JSON.parse(localStorage.getItem("built") || "[]").forEach(k => BUILT.add(k)); } catch (e) {}
 const saveBuilt = () => { try { localStorage.setItem("built", JSON.stringify([...BUILT])); } catch (e) {} };
@@ -809,44 +851,45 @@ function cut(geo, mat) {                                              // 판 + �
   m.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo, 30), lineMat));
   return m;
 }
-function groundTex() {                                                 // 바닥판 윗면 (레이저로 새김): 광장·길 = 돌 줄눈, 나머지 = 풀 획, 우물 둘레 원, 가장자리 띠
-  const { x0, x1, z0, z1 } = VILLAGE, N = 2800, px = N / (x1 - x0), M = Math.round((z1 - z0) * px), P = (x, z) => [(x - x0) * px, (z - z0) * px];
-  const canvas = () => { const c = document.createElement("canvas"); c.width = N; c.height = M; return [c, c.getContext("2d")]; };
-  const [c, g] = canvas(), base = "#c8b08a", line = "rgba(96,58,28,0.7)";
-  g.fillStyle = base; g.fillRect(0, 0, N, M);
-  const R = rnd(7);
-  g.strokeStyle = "rgba(96,58,28,0.6)"; g.lineWidth = 2.8; g.lineCap = "round";
-  for (let i = 0; i < 9000 * (x1 - x0) * (z1 - z0) / 820 / 820; i++) {                                    // 풀 (작은 ∧ 획)
-    const x = R() * N, y = R() * M, h = (2 + R() * 2.5) * px, a = (R() - 0.5) * 0.6;
-    g.beginPath(); g.moveTo(x - h * 0.45, y + h * 0.2); g.lineTo(x + Math.sin(a) * h * 0.3, y - h * 0.8); g.lineTo(x + h * 0.45, y + h * 0.15); g.stroke();
+function groundTex() { // Two wood finishes: quiet landscape grain and a readable inset paving network.
+  const {x0,x1,z0,z1}=VILLAGE,N=3072,px=N/(x1-x0),M=Math.round((z1-z0)*px),P=(x,z)=>[(x-x0)*px,(z-z0)*px];
+  const canvas=()=>{const c=document.createElement("canvas");c.width=N;c.height=M;return [c,c.getContext("2d")];};
+  const [c,g]=canvas(),R=rnd(1807);
+  g.fillStyle="#cbb48e";g.fillRect(0,0,N,M);
+  g.strokeStyle="rgba(105,72,39,.085)";g.lineWidth=.65;
+  for(let i=0;i<1700;i++){const x=R()*N,y=R()*M;g.beginPath();g.moveTo(x,y);g.bezierCurveTo(x+12,y-1,x+35,y+2,x+55+R()*90,y);g.stroke();}
+  for(const [x,z,rx,rz] of VILLAGE.greens){const [u,v]=P(x,z);g.fillStyle="rgba(106,119,69,.15)";g.beginPath();for(let i=0;i<48;i++){const a=i/48*Math.PI*2,f=1+.07*Math.sin(3*a+x)+.04*Math.cos(7*a+z),xx=u+Math.cos(a)*rx*px*f,yy=v+Math.sin(a)*rz*px*f;i?g.lineTo(xx,yy):g.moveTo(xx,yy);}g.closePath();g.fill();}
+  g.strokeStyle="rgba(91,72,39,.21)";g.lineWidth=.75;
+  for(let i=0;i<3200;i++){const x=R()*N,y=R()*M,h=(1+R()*1.3)*px;g.beginPath();g.moveTo(x-h*.4,y);g.lineTo(x,y-h);g.lineTo(x+h*.4,y);g.stroke();}
+  for(const [kind,x,z,k] of VILLAGE.planted){if(kind==='rock')continue;const [u,v]=P(x,z),r=(kind==='bush'?7:11)*k*px;g.fillStyle="rgba(111,94,58,.11)";g.beginPath();g.ellipse(u,v,r*1.25,r*.8,.3,0,Math.PI*2);g.fill();}
+  const line=(ctx,pts)=>{ctx.beginPath();pts.forEach((q,i)=>i?ctx.lineTo(...P(...q)):ctx.moveTo(...P(...q)));};
+  const polygon=(ctx,pts)=>{line(ctx,pts);ctx.closePath();};
+  // A narrow gravel finish marks garden/woodland walks, below the street paving.
+  g.lineCap=g.lineJoin='round';
+  for(const [w,pts,type] of VILLAGE.roads)if(type==='trail'){
+    line(g,pts);g.strokeStyle='#b6a17e';g.lineWidth=(w+1.3)*px;g.stroke();
+    line(g,pts);g.strokeStyle='#d8c8a8';g.lineWidth=w*px;g.stroke();
+    line(g,pts);g.strokeStyle='rgba(112,82,47,.23)';g.lineWidth=.7*px;g.setLineDash([1.3*px,5*px]);g.stroke();g.setLineDash([]);
   }
-  const [m, mg] = canvas();                                           // 돌 깔린 곳 (광장 + 길) 가림판
-  const Q = VILLAGE.square, [qx0, qy0] = P(-Q, -Q);
-  mg.fillStyle = "#fff"; mg.fillRect(qx0, qy0, 2 * Q * px, 2 * Q * px);
-  mg.strokeStyle = "#fff"; mg.lineCap = "round"; mg.lineJoin = "round";
-  for (const [w, pts] of VILLAGE.roads) { mg.lineWidth = w * px; mg.beginPath(); pts.forEach((q, i) => i ? mg.lineTo(...P(...q)) : mg.moveTo(...P(...q))); mg.stroke(); }
-  const [st, sg] = canvas();                                          // 돌 줄눈 (온 판) -> 가림판 안만 남김
-  sg.fillStyle = base; sg.fillRect(0, 0, N, M); sg.strokeStyle = line; sg.lineWidth = 3;
-  const hr = (i, j) => { const x = Math.sin(i * 127.1 + j * 311.7) * 43758.5453; return x - Math.floor(x); };
-  const [wx, wy] = P(0, 0), ring = 52 * px;
-  for (let j = 0, y = 0; y < M; j++, y += 16 * px) {
-    let x = (j % 2) * -9 * px;
-    for (let i = 0; x < N; i++) {
-      const w = (13 + 10 * hr(i, j)) * px;
-      if (Math.hypot(x + w / 2 - wx, y + 8 * px - wy) > ring + 6 * px) { sg.beginPath(); sg.roundRect ? sg.roundRect(x + 2, y + 2, w - 4, 16 * px - 4, 7) : sg.rect(x + 2, y + 2, w - 4, 16 * px - 4); sg.stroke(); }
-      x += w;
-    }
+  const [mask,mg]=canvas();mg.fillStyle=mg.strokeStyle='#fff';mg.lineCap=mg.lineJoin='round';
+  for(const pts of VILLAGE.plazas){polygon(g,pts);g.fillStyle='#ad9067';g.fill();g.strokeStyle='#97774e';g.lineWidth=1.2*px;g.stroke();polygon(mg,pts);mg.fill();}
+  for(const [w,pts,type] of VILLAGE.roads)if(type!=='trail'){
+    line(g,pts);g.strokeStyle='#9f825b';g.lineWidth=(w+1.6)*px;g.stroke();
+    line(mg,pts);mg.lineWidth=w*px;mg.stroke();
   }
-  for (let k = 0; k < 2; k++) { sg.beginPath(); sg.arc(wx, wy, ring - k * 10 * px, 0, Math.PI * 2); sg.stroke(); }
-  for (let a = 0; a < 24; a++) { const t = a / 24 * Math.PI * 2; sg.beginPath(); sg.moveTo(wx + Math.cos(t) * (ring - 10 * px), wy + Math.sin(t) * (ring - 10 * px)); sg.lineTo(wx + Math.cos(t) * ring, wy + Math.sin(t) * ring); sg.stroke(); }
-  sg.globalCompositeOperation = "destination-in"; sg.drawImage(m, 0, 0);
-  g.drawImage(st, 0, 0);
-  g.strokeStyle = line; g.lineWidth = 4; g.strokeRect(qx0 - 3, qy0 - 3, 2 * Q * px + 6, 2 * Q * px + 6);     // 광장 테 (연석)
-  g.lineWidth = 5; g.strokeRect(14 * px, 14 * px, N - 28 * px, M - 28 * px);
-  const tx = new THREE.CanvasTexture(c); tx.anisotropy = renderer.capabilities.getMaxAnisotropy();
-  return tx;
+  const [paving,pg]=canvas();pg.fillStyle='#dfcfb0';pg.fillRect(0,0,N,M);pg.strokeStyle='rgba(117,87,49,.30)';pg.lineWidth=.65*px;
+  for(let j=0,z=z0;z<z1;j++,z+=11){for(let i=0,x=x0-(j%2)*7;x<x1;i++){
+    const w=11+((i*13+j*7)%5);const [u,v]=P(x,z);pg.beginPath();pg.roundRect(u+.9*px,v+.8*px,(w-1.8)*px,9.4*px,1.6*px);pg.stroke();x+=w;
+  }}
+  pg.globalCompositeOperation='destination-in';pg.drawImage(mask,0,0);g.drawImage(paving,0,0);
+  // The well is the focus of the small market square, rather than an enormous stone carpet.
+  const [wx,wz]=P(0,0);g.strokeStyle='#aa8a5a';g.lineWidth=.8*px;
+  for(const r of [28,35]){g.beginPath();g.arc(wx,wz,r*px,0,Math.PI*2);g.stroke();}
+  for(let i=0;i<20;i++){const a=i/20*Math.PI*2;g.beginPath();g.moveTo(wx+Math.cos(a)*28*px,wz+Math.sin(a)*28*px);g.lineTo(wx+Math.cos(a)*35*px,wz+Math.sin(a)*35*px);g.stroke();}
+  g.strokeStyle='rgba(102,68,35,.55)';g.lineWidth=1.4*px;g.strokeRect(10*px,10*px,N-20*px,M-20*px);
+  const tx=new THREE.CanvasTexture(c);tx.encoding=THREE.sRGBEncoding;tx.anisotropy=renderer.capabilities.getMaxAnisotropy();return tx;
 }
-// 자연 (판 쌓기): 잎은 물결 윤곽 가로 판을 겹겹이 (위로 갈수록 작게, 가운데가 조금씩 떠돎), 줄기는 엇갈려 꽂은 세로 판 둘.
+// 자연: 교차 세로판과 소수의 얇은 수관 판. 나무 한 그루가 수십 장의 원판 더미로 보이지 않게 한다.
 // 키트의 쌓은 원판과 같은 결 (옆면 = 옅은 탄 색)
 const sliceMat = [birchMat, new THREE.MeshStandardMaterial({ color: 0xc8a67c, roughness: 0.9, metalness: 0 })];
 const leafMat = [new THREE.MeshStandardMaterial({ color: 0xe8d7b4, roughness: 0.85, metalness: 0 }), sliceMat[1]];
@@ -874,33 +917,26 @@ function trunk(h, w, branch) {                                        // 줄기 
   for (const ry of [0, Math.PI / 2]) { const geo = new THREE.ExtrudeGeometry(sh, { depth: 2, bevelEnabled: false }); geo.translate(0, 0, -1); const m = new THREE.Mesh(geo, sliceMat); m.rotation.y = ry; m.castShadow = true; g.add(m); }
   return g;
 }
-function crown(g, R, cx, cy, cz, rx, ry, lh, off = 0) {               // 잎 덩어리: 달걀꼴 안에 판을 겹겹이
-  const n = Math.max(3, Math.round(2 * ry / lh)), sx = R() * 6.28;
-  for (let i = 0; i < n; i++) {
-    const t = (i + 0.5) / n * 2 - 1, e = t < 0 ? Math.sqrt(1 - t * t * 0.92) : Math.sqrt(1 - t * t), r = rx * Math.max(0.18, e);
-    const wx = Math.sin(sx + i * 0.9) * rx * 0.1, wz = Math.cos(sx * 1.3 + i * 0.7) * rx * 0.1;
-    g.add(slab(blob(r, R), lh * 0.92, cy - ry + i * lh + off, cx + wx, cz + wz, leafMat, R() * 6.28));
-  }
+function upright(shape,t,y=0,rotation=0,mat=leafMat){
+  const geo=new THREE.ExtrudeGeometry(shape,{depth:t,bevelEnabled:false,curveSegments:6});geo.translate(0,0,-t/2);
+  const m=new THREE.Mesh(geo,mat);m.position.y=y;m.rotation.y=rotation;m.castShadow=m.receiveShadow=true;return m;
 }
-function tree(x, z, s, kind = "oak", seed = 1) {
-  const g = new THREE.Group(), R = rnd(Math.floor(seed * 7919) % 2147483646 + 1);
-  if (kind === "pine") {                                              // 바늘잎 나무: 별 판이 층층이 (층마다 돌려 놓고, 세 장마다 넓어짐)
-    g.add(trunk(18 * s, 2.4 * s, false));
-    const n = Math.round(22 * s / 1.0), h = 2.6;
-    for (let i = 0; i < n * 0.9; i++) {
-      const t = i / n, tier = (i % 4) / 3, r = 21 * s * (1 - t) * (0.62 + 0.38 * (1 - tier)) + 1.5;
-      g.add(slab(blob(r, R, 16, 0, 0, 1), h * 0.9, 12 * s + i * h, 0, 0, leafMat, i * 0.39));
-    }
-  } else {                                                            // 넓은잎 나무: 큰 덩어리 + 옆 작은 덩어리 둘 (판 높이를 엇갈려 겹쳐도 깜빡이지 않게)
-    const H = 46 * s, lh = 2.8;
-    g.add(trunk(H * 0.72, 3.0 * s, true));
-    crown(g, R, 0, H * 0.82, 0, 24 * s, 17 * s, lh);
-    const a = R() * 6.28;
-    crown(g, R, Math.cos(a) * 16 * s, H * 0.62, Math.sin(a) * 16 * s, 14 * s, 10 * s, lh, lh / 3);
-    crown(g, R, Math.cos(a + 2.6) * 15 * s, H * 0.66, Math.sin(a + 2.6) * 15 * s, 13 * s, 9 * s, lh, 2 * lh / 3);
+function tree(x,z,s,kind="oak",seed=1){
+  const g=new THREE.Group(),R=rnd(Math.floor(seed*7919)%2147483646+1);
+  g.add(trunk(kind==='pine'?40:43,2.4,kind!=='pine'));
+  if(kind==='pine'){
+    const sh=new THREE.Shape(),pts=[[0,66],[-5,52],[-2,53],[-11,39],[-6,41],[-17,24],[-10,27],[-21,12],[0,16],[21,12],[10,27],[17,24],[6,41],[11,39],[2,53],[5,52]];
+    pts.forEach(([a,b],i)=>i?sh.lineTo(a,b):sh.moveTo(a,b));sh.closePath();
+    g.add(upright(sh,1.6,0,0),upright(sh,1.6,0,Math.PI/2));
+    for(const [y,r] of [[20,18],[34,12],[48,6.8]])g.add(slab(blob(r,R,16,0,0,1),1.3,y,0,0,leafMat,y*.13));
+  }else{
+    const sh=blob(23,R,40,5,.09);
+    const make=rotation=>{const m=upright(sh,1.5,43,rotation);m.geometry.scale(1,.73,1);return m;};
+    g.add(make(0),make(Math.PI/2));
+    for(const [y,r,dx,dz] of [[30,15,0,0],[38,23,0,0],[46,20,0,0],[53,11.5,0,0],[33,11,-12,4],[36,10,12,-4]])g.add(slab(blob(r,R,32,5,.08),1.2,y,dx,dz,leafMat,R()*6.28));
   }
-  g.add(slab(blob(10 * s, R, 36, 5, 0.08), 2, 0, 0, 0));                 // 받침 (흙 판)
-  g.position.set(x, 0, z); g.rotation.y = R() * 6.28; return g;
+  g.add(slab(blob(7,R,24,4,.08),1.5,0));
+  g.position.set(x,0,z);g.scale.setScalar(s);g.rotation.y=R()*6.28;return g;
 }
 function bush(x, z, s, seed = 1) {                                    // 덤불: 물결 판 서너 장
   const g = new THREE.Group(), R = rnd(Math.floor(seed * 104729) % 2147483646 + 1), n = 4;
@@ -916,28 +952,87 @@ function rock(x, z, s, seed = 1) {                                    // 돌: �
   }
   g.position.set(x, 0, z); return g;
 }
+function mapProp(kind,x,z,rot){
+  const g=new THREE.Group(),box=(w,h,d,px,py,pz)=>{const m=cut(new THREE.BoxGeometry(w,h,d),birchMat);m.position.set(px,py,pz);g.add(m);};
+  if(kind==='bench'){
+    for(const dx of [-6.5,6.5]){box(1.5,6,6,dx,3,0);box(1.5,11,1.5,dx,5.5,-2.8);}
+    box(19,1.2,2.5,0,6.6,1.8);box(19,1.2,2.5,0,6.6,-1.3);box(19,3,1.2,0,9.5,-3.2);
+  }else if(kind==='lamp'){
+    box(7,1.4,7,0,.7,0);box(2.2,17,2.2,0,9,0);
+    const frame=new THREE.Shape();frame.moveTo(-3,17);frame.lineTo(3,17);frame.lineTo(3,24);frame.lineTo(-3,24);frame.closePath();
+    const h=new THREE.Path();h.moveTo(-1.6,18.2);h.lineTo(-1.6,22.7);h.lineTo(1.6,22.7);h.lineTo(1.6,18.2);h.closePath();frame.holes.push(h);
+    g.add(upright(frame,1.2,0,0,sliceMat),upright(frame,1.2,0,Math.PI/2,sliceMat));
+    box(8,1.2,8,0,24.6,0);box(3,1.2,3,0,25.8,0);
+  }else if(kind==='sign'){
+    box(2,18,2,0,9,0);const sh=new THREE.Shape();sh.moveTo(-6,-1.8);sh.lineTo(4,-1.8);sh.lineTo(7,0);sh.lineTo(4,1.8);sh.lineTo(-6,1.8);sh.closePath();
+    g.add(upright(sh,1.1,14,0,sliceMat),upright(sh,1.1,10,Math.PI/2,sliceMat));
+  }else{
+    box(14,1.2,8,0,.6,0);for(const dz of [-3.5,3.5])box(14,4,1.2,0,3,dz);for(const dx of [-6.4,6.4])box(1.2,4,6,dx,3,0);
+    for(const dx of [-4,0,4])g.add(slab(blob(3.8,rnd(44+dx),20,4,.1),1.2,5.1,dx,0,leafMat));
+  }
+  g.position.set(x,0,z);g.rotation.y=rot*Math.PI/2;g.userData.decorKind=kind;return g;
+}
+const villageDistance=(x,z,a,b)=>{const dx=b[0]-a[0],dz=b[1]-a[1],t=Math.max(0,Math.min(1,((x-a[0])*dx+(z-a[1])*dz)/(dx*dx+dz*dz||1)));return Math.hypot(x-a[0]-t*dx,z-a[1]-t*dz);};
+function villageInside(x,z,poly){let inside=false;for(let i=0,j=poly.length-1;i<poly.length;j=i++){const a=poly[i],b=poly[j];if((a[1]>z)!==(b[1]>z)&&x<(b[0]-a[0])*(z-a[1])/(b[1]-a[1])+a[0])inside=!inside;}return inside;}
+function villageClear(x,z,r,plazas=true){
+  if(x-r<VILLAGE.x0+13||x+r>VILLAGE.x1-13||z-r<VILLAGE.z0+13||z+r>VILLAGE.z1-13)return false;
+  for(const v of VILLAGE.slots){const b=v.footprint;if(b&&Math.hypot(Math.max(b[0]-x,0,x-b[2]),Math.max(b[1]-z,0,z-b[3]))<r+5)return false;}
+  for(const [w,pts] of VILLAGE.roads)for(let i=1;i<pts.length;i++)if(villageDistance(x,z,pts[i-1],pts[i])<r+w/2+2)return false;
+  if(plazas)for(const poly of VILLAGE.plazas){if(villageInside(x,z,poly))return false;for(let i=0;i<poly.length;i++)if(villageDistance(x,z,poly[i],poly[(i+1)%poly.length])<r+3)return false;}
+  if(Math.hypot(x-VILLAGE.pond[0],z-VILLAGE.pond[1])<VILLAGE.pond[2]+r+11)return false;
+  // The inner boundary has real openings for paths; trunks and props do not pierce its remaining segments.
+  if(Math.abs(x-403)<r+4&&!VILLAGE.wallGaps.inner.some(([at,half])=>Math.abs(z-at)+r<half))return false;
+  return true;
+}
+function decorateVillage(){
+  for(const v of VILLAGE.slots)if(v.kit.startsWith('gh')){
+    const b=v.footprint,front=v.rot===0?b[3]+.8:b[1]-.8,lane=v.z<0?-150:150;
+    VILLAGE.roads.push([8,[[v.x,front],[v.x,lane]],'door']);
+  }
+  for(const [width,points] of VILLAGE.roads)for(const end of [0,points.length-1]){
+    const p=points[end],next=points[end===0?1:points.length-2],dx=next[0]-p[0],dz=next[1]-p[1],len=Math.hypot(dx,dz);if(!len)continue;
+    for(let n=0;n<width+8;n++){
+      const near=VILLAGE.slots.some(v=>{const b=v.footprint;return v.kit!=='gatehouse'&&Math.hypot(Math.max(b[0]-p[0],0,p[0]-b[2]),Math.max(b[1]-p[1],0,p[1]-b[3]))<width/2+.65;});
+      if(!near)break;p[0]+=dx/len*.5;p[1]+=dz/len*.5;
+    }
+  }
+  const used=[];VILLAGE.placedProps=[];VILLAGE.planted=[];
+  for(const [kind,x,z,rot] of VILLAGE.props){
+    const r={bench:10.5,lamp:5,sign:8,planter:8.5}[kind],candidates=[[x,z]];
+    for(const distance of [4,8,12,16,20,24])for(let i=0;i<12;i++){const a=i*Math.PI/6;candidates.push([x+Math.cos(a)*distance,z+Math.sin(a)*distance]);}
+    const site=candidates.find(([a,b])=>villageClear(a,b,r,false)&&Math.hypot(a,b)>r+37&&!used.some(([c,d,r0])=>Math.hypot(a-c,b-d)<r+r0+2));
+    if(!site)continue;const [a,b]=site;
+    VILLAGE.placedProps.push([kind,a,b,rot,r]);mapRoot.add(mapProp(kind,a,b,rot));used.push([a,b,r]);
+  }
+  for(const [kind,x,z,k] of VILLAGE.nature){
+    const r=({oak:28,pine:22,bush:12,rock:8}[kind])*k;
+    if(!villageClear(x,z,r)||used.some(([a,b,r0])=>Math.hypot(x-a,z-b)<(r+r0)*.82))continue;
+    const obj=kind==='bush'?bush(x,z,k,VILLAGE.planted.length+3):kind==='rock'?rock(x,z,k,VILLAGE.planted.length+5):tree(x,z,k,kind,VILLAGE.planted.length+1);
+    obj.userData.decorKind=kind;obj.userData.clearanceRadius=r;mapRoot.add(obj);VILLAGE.planted.push([kind,x,z,k,r]);used.push([x,z,r]);
+  }
+}
 function walls(h) {                                                   // 낮은 담 + 기둥 머리. 바깥 둘레 + 옛 마을 동쪽 담 (안쪽 담). 문·길 자리는 트임
   const g = new THREE.Group(), { x0, x1, z0, z1 } = VILLAGE, gate = VILLAGE.slots.find(v => v.kit === "gatehouse");
-  const seg = (a0, a1) => {                                           // x 방향 a0..a1 한 토막 (나중에 돌려 놓음)
+  const seg = (a0, a1, height=h) => {                                           // x 방향 a0..a1 한 토막 (나중에 돌려 놓음)
     const w = new THREE.Group(), len = a1 - a0, n = Math.max(1, Math.round(len / 58));
-    const m = cut(new THREE.BoxGeometry(len, h, 5), birchMat); m.position.set((a0 + a1) / 2, h / 2, 0); w.add(m);
+    const m = cut(new THREE.BoxGeometry(len, height, 5), birchMat); m.position.set((a0 + a1) / 2, height / 2, 0); w.add(m);
     for (let k = 0; k <= n; k++) {
-      const x = a0 + 4.5 + (len - 9) * k / n, p = cut(new THREE.BoxGeometry(9, h + 6, 9), birchMat); p.position.set(x, (h + 6) / 2, 0);
-      const cap = cut(new THREE.ConeGeometry(6.6, 6, 4), birchMat); cap.rotation.y = Math.PI / 4; cap.position.set(x, h + 9, 0); w.add(p, cap);
+      const x = a0 + 4.5 + (len - 9) * k / n, p = cut(new THREE.BoxGeometry(9, height + 6, 9), birchMat); p.position.set(x, (height + 6) / 2, 0);
+      const cap = cut(new THREE.ConeGeometry(6.6, 6, 4), birchMat); cap.rotation.y = Math.PI / 4; cap.position.set(x, height + 9, 0); w.add(p, cap);
     }
     return w;
   };
-  const line = (along, a0, a1, at, gaps) => {                          // along = "x" (z = at) / "z" (x = at), gaps = [(가운데, 반폭)]
+  const line = (along, a0, a1, at, gaps, height=h) => {                          // along = "x" (z = at) / "z" (x = at), gaps = [(가운데, 반폭)]
     let cuts = [[a0, a1]];
     for (const [c, hw] of gaps) cuts = cuts.flatMap(([p, q]) => [[p, Math.min(q, c - hw)], [Math.max(p, c + hw), q]]).filter(([p, q]) => q - p > 12);
-    for (const [p, q] of cuts) { const w = seg(p, q); if (along === "x") w.position.set(0, 0, at); else { w.rotation.y = -Math.PI / 2; w.position.set(at, 0, 0); } g.add(w); }
+    for (const [p, q] of cuts) { const w = seg(p, q, height); if (along === "x") w.position.set(0, 0, at); else { w.rotation.y = -Math.PI / 2; w.position.set(at, 0, 0); } g.add(w); }
   };
   const e = 7;
-  line("x", x0 + e, x1 - e, z0 + e, [[700, 16]]);                     // 뒤 (-z)
-  line("x", x0 + e, x1 - e, z1 - e, [[gate.x, 30], [700, 16]]);       // 앞 (+z): 마을 문, 주거 구역 길
-  line("z", z0 + e, z1 - e, x0 + e, []);                              // 서 (-x)
-  line("z", z0 + e, z1 - e, x1 - e, [[-150, 24], [150, 24]]);         // 동 (+x): 큰길 끝
-  line("z", z0 + e, z1 - e, 403, [[-150, 24], [150, 24]]);            // 옛 마을 동쪽 담 (안쪽 담): 큰길 자리 트임
+  line("x", x0 + e, x1 - e, z0 + e, VILLAGE.wallGaps.north);                     // 뒤 (-z)
+  line("x", x0 + e, x1 - e, z1 - e, VILLAGE.wallGaps.south);       // 앞 (+z): 마을 문, 주거 구역 길
+  line("z", z0 + e, z1 - e, x0 + e, VILLAGE.wallGaps.west);                              // 서 (-x)
+  line("z", z0 + e, z1 - e, x1 - e, VILLAGE.wallGaps.east);         // 동 (+x): 큰길 끝
+  line("z", z0 + e, z1 - e, 403, VILLAGE.wallGaps.inner, 7);            // 옛 마을 동쪽 담 (안쪽 담): 큰길 자리 트임
   return g;
 }
 function pond([x, z, r]) {                                            // 연못: 물 판 (푸른 아크릴) + 둘레 돌 판
@@ -947,21 +1042,29 @@ function pond([x, z, r]) {                                            // 연못:
   for (let i = 0; i < 18; i++) { const t = i / 18 * 6.28 + R() * 0.2; g.add(rock(x + Math.cos(t) * (r + 3), z + Math.sin(t) * (r + 3), 0.55 + R() * 0.35, 40 + i)); }
   return g;
 }
-function fitMap() {                                                   // 앞 모서리 쪽 위에서 비스듬히 (map.png 처럼)
-  const { x0, x1, z0, z1 } = VILLAGE, r = Math.hypot(x1 - x0, z1 - z0) / 2, dir = new THREE.Vector3(1, 1, 1).normalize();   // 판을 감싼 구가 화면에 들게
-  const vf = THREE.MathUtils.degToRad(camera.fov / 2), hf = Math.atan(Math.tan(vf) * camera.aspect), dist = r / Math.sin(Math.min(vf, hf)) * 0.8;
-  controls.target.set((x0 + x1) / 2, 50, (z0 + z1) / 2); camera.position.copy(controls.target).addScaledVector(dir, dist);
-  camera.near = dist / 50; camera.far = dist * 20; camera.updateProjectionMatrix(); controls.update();
+function fitMap(){ // Fit projected geometry, including the near board corner and tall landmarks.
+  const {x0,x1,z0,z1}=VILLAGE,target=new THREE.Vector3((x0+x1)/2,45,(z0+z1)/2),dir=new THREE.Vector3(1,1.35,1).normalize();
+  const right=new THREE.Vector3().crossVectors(new THREE.Vector3(0,1,0),dir).normalize(),up=new THREE.Vector3().crossVectors(dir,right);
+  const vf=THREE.MathUtils.degToRad(camera.fov/2),hf=Math.atan(Math.tan(vf)*camera.aspect);let dist=1;
+  mapRoot.updateMatrixWorld(true);
+  mapRoot.traverse(o=>{if(!o.isMesh)return;o.geometry.computeBoundingBox();const b=o.geometry.boundingBox;if(!b)return;
+    for(const x of [b.min.x,b.max.x])for(const y of [b.min.y,b.max.y])for(const z of [b.min.z,b.max.z]){
+      const p=new THREE.Vector3(x,y,z).applyMatrix4(o.matrixWorld).sub(target),depth=p.dot(dir);
+      dist=Math.max(dist,depth+Math.abs(p.dot(right))/Math.tan(hf),depth+Math.abs(p.dot(up))/Math.tan(vf));
+    }
+  });
+  dist*=1.13;controls.target.copy(target);camera.position.copy(target).addScaledVector(dir,dist);
+  camera.near=dist/100;camera.far=dist*20;camera.updateProjectionMatrix();controls.update();
 }
 async function buildMap() {
   mapRoot = new THREE.Group(); scene.add(mapRoot);
   const { x0, x1, z0, z1 } = VILLAGE, W = x1 - x0, D = z1 - z0, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, T = 14;
-  const top = new THREE.MeshStandardMaterial(SVG ? { color: 0xc8b08a, roughness: 0.88, metalness: 0 } : { map: groundTex(), roughness: 0.88, metalness: 0 });   // SVG 는 무늬 (질감) 를 못 그림
+  const top = new THREE.MeshStandardMaterial({ color: SVG ? 0xc8b08a : 0xffffff, roughness: 0.88, metalness: 0 });   // SVG 는 무늬 (질감) 를 못 그림
   const board = new THREE.Mesh(new THREE.BoxGeometry(W, T, D), [burnMat, burnMat, top, burnMat, burnMat, burnMat]);
   board.position.set(cx, -T / 2 - 0.01, cz); board.receiveShadow = true; mapRoot.add(board);
   const lip = cut(new THREE.BoxGeometry(W + 10, 4, D + 10), birchMat); lip.position.set(cx, -T - 2, cz); mapRoot.add(lip);
   mapRoot.add(walls(14), pond(VILLAGE.pond));
-  VILLAGE.nature.forEach(([kind, x, z, k], i) => mapRoot.add(kind === "bush" ? bush(x, z, k, i + 3) : kind === "rock" ? rock(x, z, k, i + 5) : tree(x, z, k, kind, i + 1)));
+
   const SC = Object.fromEntries(await Promise.all([...VKITS].map(id => glbScene(id).then(sc => [id, sc], () => [id, null]))));   // 아직 안 올라간 키트는 자리만 비움
   VILLAGE.slots.forEach((v, i) => {
     if (!SC[v.kit]) return;
@@ -976,7 +1079,9 @@ async function buildMap() {
     const drop = new THREE.Group(); drop.add(solid, ghost);                               // 건물 한 채 (판 + 실루엣)
     const holder = new THREE.Group(); holder.add(drop, hit); v.hit = hit; holder.position.set(v.x, 0, v.z); holder.rotation.y = v.rot * Math.PI / 2;
     holder.userData.slot = i; Object.assign(v, { holder, solid, ghost }); mapRoot.add(holder);
+    holder.updateMatrixWorld(true);const footprint=new THREE.Box3().setFromObject(hit);v.footprint=[footprint.min.x,footprint.min.z,footprint.max.x,footprint.max.z];
   });
+  decorateVillage();if(!SVG){top.map=groundTex();top.needsUpdate=true;}
   showVillage();
 }
 function showVillage() {                                              // 지은 건물만 (판은 모두 제자리), 나머지는 실루엣
