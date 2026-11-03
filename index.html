@@ -135,6 +135,9 @@ body { background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, sans-
   <symbol id="i-out" viewBox="0 0 24 24"><path d="M12 15V3M7 8l5-5 5 5M5 13v7h14v-7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-join" viewBox="0 0 24 24"><path d="M5 4h6v6M19 20h-6v-6M11 4L4 11M13 20l7-7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 15l6-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
   <symbol id="i-split" viewBox="0 0 24 24"><path d="M4 10V4h6M20 14v6h-6M4 4l6 6M20 20l-6-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-hyangwonjeong" viewBox="0 0 24 24"><path d="M2 21h20M4 19V9m16 10V9M4 14h16M7 19v-5m10 5v-5M2 9l5-3 5-4 5 4 5 3H2Zm5 3h10M8 12V9m8 3V9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+  <symbol id="i-buyongpavilion" viewBox="0 0 24 24"><path d="M2 12l5-3 5-6 5 6 5 3M3 12h18M7 9l5 3 5-3M5 13v7M19 13v7M9 14v6M15 14v6M3 20h18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-gwallamjeong" viewBox="0 0 24 24"><path d="M3 20q9 4 18 0M5 19V11m14 8v-8M2 10q10 5 20 0L12 2 2 10Zm10-8v11M5 15q7 4 14 0M8 17v4m8-4v4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
   <symbol id="i-moonpavilion" viewBox="0 0 24 24"><path d="M2 22h20M4 20V11m16 9v-9M8 20v-5m8 5v-5M2 11l5-4h10l5 4H2Zm4-6 6-3 6 3H6Zm3 2V5m6 2V5M4 13h16M4 17h4m8 0h4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
   <symbol id="i-moonbridge_layered" viewBox="0 0 24 24"><path d="M3 20V9M21 20V9M3 10Q12 3 21 10M3 13Q12 6 21 13M3 18Q12 11 21 18M3 21Q12 14 21 21M7 9v7M12 8v7M17 9v7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-moonbridge" viewBox="0 0 24 24"><path d="M3 18V8M21 18V8M3 10Q12 3 21 10M3 17Q12 10 21 17M7 8v7M12 7v7M17 8v7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
@@ -221,7 +224,7 @@ body { background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, sans-
 
 <script>
 const $ = id => document.getElementById(id);
-const DATA_V = "40";                                                    // 키트 자료 판 (바꿔 올릴 때 올림: 브라우저에 남은 옛 자료와 섞이지 않게)
+const DATA_V = "41-pavilions";                                                    // 키트 자료 판 (바꿔 올릴 때 올림: 브라우저에 남은 옛 자료와 섞이지 않게)
 const cssColor = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 let KIT, slots = {}, placed = new Set(), selected = null, stats = { miss: 0, hint: 0 }, timer = null, started = 0;
 
@@ -557,7 +560,7 @@ function stepMotion(now) {
 }
 
 // ---------- 키트 (소품마다 data/<id>/): 고르면 조립대를 비우고 새로 깖
-const KITS = [{ id: "citadel", name: "해자 성채" }, { id: "cathedral", name: "대성당" }, { id: "moonpavilion", name: "달빛 누각" }, { id: "moonbridge_layered", name: "달빛 개울다리 · 겹쌓기" }, { id: "moonbridge", name: "달빛 개울다리" }, { id: "windmill", name: "풍차" }, { id: "cart", name: "수레" }, { id: "cottage_kit", name: "오두막" }, { id: "well", name: "우물" },
+const KITS = [{ id: "buyongpavilion", name: "부용 누각 · A" }, { id: "hyangwonjeong", name: "향원 육각 누각 · B" }, { id: "gwallamjeong", name: "부채정 · 관람정 모티프 · C" }, { id: "citadel", name: "해자 성채" }, { id: "cathedral", name: "대성당" }, { id: "moonpavilion", name: "달빛 누각" }, { id: "moonbridge_layered", name: "달빛 개울다리 · 겹쌓기" }, { id: "moonbridge", name: "달빛 개울다리" }, { id: "windmill", name: "풍차" }, { id: "cart", name: "수레" }, { id: "cottage_kit", name: "오두막" }, { id: "well", name: "우물" },
               { id: "mill", name: "방앗간" }, { id: "carousel", name: "회전목마" }, { id: "ferris", name: "관람차" },
               { id: "lighthouse", name: "등대" }, { id: "gate", name: "성문" }, { id: "clocktower", name: "시계탑" }, { id: "crane", name: "크레인" }, { id: "ship", name: "범선" },
               { id: "viking", name: "바이킹" }, { id: "beam", name: "빔 엔진" }, { id: "treehouse", name: "나무 위 집" }, { id: "observatory", name: "천문대" }, { id: "train", name: "기관차" },
@@ -1100,14 +1103,27 @@ function refresh() {
   $("s-miss").textContent = stats.miss; $("s-hint").textContent = stats.hint;
 }
 
-// ---------- 규칙 (하나뿐): 판은 6 방향 중 이미 놓인 판에 안 걸리는 곧은 길로 들어오고 나감. 순서·받침 규칙 없음 (실루엣이 지그처럼 잡아 줌)
+// ---------- 규칙: 기본은 곧은 길 + 막는 덩어리 들기. 새 키트만 rules.support로 실제 받침 선행 조건을 명시.
+// before는 설명서 순서이며 받침 판정에 쓰지 않음. support는 모든 필수 받침; 받침 모드는 자동 들기 없음.
 // out[k] = 그 판을 제자리에서 방향 k 로 밀어낼 때 부딪히는 판 (미리 계산). 들어오기 = 그 길을 거꾸로.
 const hitOut = (id, k, set = bodyOf(id)) => slots[id].out[k].filter(q => set.has(q) && q !== id);   // 같은 덩어리 (따로 놓인 덩어리끼리는 안 부딪힘)
 function plan(id) {
+  if (KIT.rules?.support) {
+    const body = bodyOf(id);
+    if (placed.has(id)) {
+      // A bearing cannot be pulled out while a seated dependent remains.
+      const dependents = [...body].filter(q => q !== id && (slots[q].support || []).includes(id));
+      if (dependents.length) return { blockers: dependents, reason: "dependent" };
+    } else {
+      const missing = (slots[id].support || []).filter(q => !body.has(q));
+      if (missing.length) return { blockers: missing, missing, reason: "support" };
+    }
+  }
   // 1) 곧은 길 하나라도 비었으면 바로 (풀이 때 쓴 방향을 먼저 써 봄: 보기 좋은 동작)
   const pref = slots[id].insert.map(v => -v), ks = DI().sort((a, b) => dot(KIT.dirs[b], pref) - dot(KIT.dirs[a], pref));
   let fewest = null;
   for (const k of ks) { const b = hitOut(id, k); if (!b.length) return { k }; if (!fewest || b.length < fewest.length) fewest = b; }
+  if (KIT.rules?.support || KIT.rules?.autoLift === false) return { blockers: fewest };
   // 2) 길을 막는 판들을 한 방향 e 로 들어 올림 (그 길에 걸리는 놓인 판도 같이 = 실제로 같이 들리는 덩어리) -> 판 넣음 -> 내림.
   //    탭은 장부 구멍에서 곧게 빠지니 결합된 판이라도 e 쪽으로 안 걸리면 남음. 들리는 덩어리가 새 판에 걸리면 안 됨.
   const E = DI().sort((a, b) => KIT.dirs[b][1] - KIT.dirs[a][1]), all = bodyOf(id).size;   // 위로 드는 것부터
@@ -1125,10 +1141,10 @@ function plan(id) {
 }
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const DI = () => KIT.dirs.map((_, i) => i);                         // 곧게 드나드는 방향 번호 (축 6 + 비스듬한 판의 방향)
-function flash(ids) {                                             // 막는 판을 잠깐 붉게 (해 본 뒤에만)
+function flash(ids, ghosts = false) {                                             // 막는 판을 잠깐 붉게 (해 본 뒤에만)
   for (const id of ids || []) {
     const s = slots[id], m = new THREE.Mesh(s.mesh.geometry, new THREE.MeshBasicMaterial({ color: cssColor("--bad"), transparent: true, opacity: 0.55, depthWrite: false }));
-    m.matrixAutoUpdate = false; m.matrix.copy(s.mesh.matrixWorld); m.renderOrder = 4; scene.add(m);
+    m.matrixAutoUpdate = false; m.matrix.copy(ghosts ? s.ghost.matrixWorld : s.mesh.matrixWorld); m.renderOrder = 4; scene.add(m);
     setTimeout(() => scene.remove(m), 900);
   }
 }
@@ -1163,7 +1179,11 @@ function place(id, p) {
 }
 function takeOut(id, x, y) {                                       // 놓인 판 빼기: 끼울 때와 같은 길 규칙 (곧은 길, 아니면 막는 덩어리를 들었다 내림)
   const p = plan(id);
-  if (p.blockers) { mark(x, y, "wait"); flash(p.blockers); offerOut(p.blockers); return; }
+  if (p.blockers) {
+    mark(x, y, "wait"); flash(p.blockers); offerOut(p.blockers);
+    if (p.reason === "dependent") $("live").textContent = `이 받침 위의 판 ${p.blockers.join(", ")} 먼저 빼기`;
+    return;
+  }
   const s = slots[id], t = liftAround(p, 0, 420), h = homeOf(id);
   stopMotion(); settle(s.mesh); placed.delete(id);
   const floor = boxOf(s, offOf(s.module)).min.y, vertical = KIT.dirs[p.k][1];
@@ -1199,7 +1219,11 @@ renderer.domElement.addEventListener("pointerup", e => {
   if (!same.length) return miss(e.clientX, e.clientY, "bad");
   let first = null;
   for (const s of same) { const p = plan(s.id); if (!p.blockers) return place(s.id, p); first ||= p; }
-  miss(e.clientX, e.clientY, "wait"); flash(first.blockers); offerOut(first.blockers);                                  // 막는 판을 보여 줌
+  miss(e.clientX, e.clientY, "wait");
+  if (first.missing) {
+    clearOuts(); flash(first.missing, true);
+    $("live").textContent = `받침 판 ${first.missing.join(", ")} 먼저 끼우기`;
+  } else { flash(first.blockers); offerOut(first.blockers); } // 이미 놓인 막는 판만 빼기 단추
 });
 
 // ---------- 힌트 (누를 때만): 고른 판이 지금 들어갈 자리 하나 / 안 골랐으면 지금 끼울 수 있는 판 하나를 골라 줌
@@ -1313,6 +1337,7 @@ function finish() {
   sfx("done"); startMotion();
 }
 function reset() {
+  $("live").textContent = "";
   stopMotion(); clearOuts(); placed.clear(); selected = null; stats = { miss: 0, hint: 0 }; clearInterval(timer); started = 0; demoRun = false;
   for (const m of KIT.modules) MOD[m].joined = m === KIT.base;                                // 덩어리는 다시 탁자 위 제자리로
   for (const s of Object.values(slots)) { s.mesh.visible = false; s.ghost.visible = true; }
