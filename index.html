@@ -174,6 +174,9 @@ body { background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, sans-
   <symbol id="i-map" viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5zM3 8v8l9 5 9-5V8M12 13v8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-inn" viewBox="0 0 24 24"><path d="M3 11l6-6h6l6 6M5 10v10h14V10M9 20v-5h3v5M14 13h3v3h-3M17 5v3M19 15h2v4h-2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-bakery" viewBox="0 0 24 24"><path d="M10 10l5-5 6 6M12 9v11h8V10M15 20v-4h2v4M3 20v-5a4 4 0 0 1 8 0v5zM5.5 20v-3h3v3M2 20h20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-canal_library" viewBox="0 0 24 24"><path d="M2 21h20M3 21V7h18v14M2 7l3-4h14l3 4M6 19v-4a2 2 0 014 0v4m4 0v-4a2 2 0 014 0v4M6 9v3m4-3v3m4-3v3m4-3v3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+  <symbol id="i-terrace_monastery" viewBox="0 0 24 24"><path d="M2 22h20M3 22v-8h6v8m-7-8l4-4 4 4m2 8V8h8v14M10 8l6-5 6 5M13 12h2m2 0h2m-6 4h2m2 0h2M8 22v-3h2v-3h2M4 17h3M14 5V1h3v3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+  <symbol id="i-bridge_guildhall" viewBox="0 0 24 24"><path d="M1 22h22M2 21v-7h20v7M4 21v-3a2 2 0 014 0v3m0 0v-3a2 2 0 014 0v3m0 0v-3a2 2 0 014 0v3m0 0v-3a2 2 0 014 0v3M3 14V7h5v7M2 7l3.5-4L9 7m0 7V5h6v9M8 5l4-4 4 4m0 9V8h5v6m-6-6l3.5-4L22 8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
   <symbol id="i-watergate" viewBox="0 0 24 24"><path d="M2 22h20M3 22V7h5v15m8 0V7h5v15M1 7l4.5-5L10 7m4 0 4.5-5L23 7M8 10h8M9 21V12h6v9m-4-8v8m2-8v8M8 5h8M10 5V2h4v3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
   <symbol id="i-citadel" viewBox="0 0 24 24"><path d="M3 21V6h3V3h3v3h6V3h3v3h3v15H3M3 10h18M9 21v-6a3 3 0 0 1 6 0v6M9 10V8h6v2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
   <symbol id="i-cathedral" viewBox="0 0 24 24"><path d="M3 21V10l6-5 6 5v11M6 21v-7h6v7M15 21V7h6v14M15 7l3-6 3 6M18 10v3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9" cy="10" r="2" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
@@ -240,7 +243,7 @@ body { background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, sans-
 
 <script>
 const $ = id => document.getElementById(id);
-const DATA_V = "50-watergate";                                                    // 키트 자료 판 (바꿔 올릴 때 올림: 브라우저에 남은 옛 자료와 섞이지 않게)
+const DATA_V = "51-architecture-trio";                                                    // 키트 자료 판 (바꿔 올릴 때 올림: 브라우저에 남은 옛 자료와 섞이지 않게)
 const cssColor = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 let KIT, slots = {}, placed = new Set(), selected = null, stats = { miss: 0, hint: 0 }, timer = null, started = 0;
 
@@ -275,7 +278,7 @@ function recolor() { scene.background = new THREE.Color(cssColor("--stage")); gh
 recolor();
 const mq = window.matchMedia("(prefers-color-scheme: dark)"); if (mq.addEventListener) mq.addEventListener("change", recolor);
 new MutationObserver(recolor).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-const resize = () => { const w = stage.clientWidth, h = stage.clientHeight; if (!w || !h) return; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); if (KIT?.design === "watergate" && !mapOn && !bridgeCycle && !demo && !bridgeState?.busy && placed.size === KIT.plates && allJoined()) frameWatergate(); };
+const resize = () => { const w = stage.clientWidth, h = stage.clientHeight; if (!w || !h) return; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); if (["watergate", "canal_library", "terrace_monastery", "bridge_guildhall"].includes(KIT?.design) && !mapOn && !bridgeCycle && !demo && !bridgeState?.busy && placed.size === KIT.plates && allJoined()) frameArchitecturalKit(); };
 new ResizeObserver(resize).observe(stage); resize();
 
 // ---------- 소리 (합성, 파일 없음): 판이 자리에 '톡', 빼기 '딱', 덩어리 합침 '쿵', 그 자리 아님 '둑둑', 아직 '똑똑', 완성 실로폰. 끌 수 있음 (기억)
@@ -739,7 +742,7 @@ function stepMotion(now) {
 }
 
 // ---------- 키트 (소품마다 data/<id>/): 고르면 조립대를 비우고 새로 깖
-const KITS = [{ id: "watergate", name: "기계 수문탑" }, { id: "railway_terminal", name: "대시계 철도역" }, { id: "courtyardpalace", name: "다층 처마 궁궐" }, { id: "botanical_conservatory", name: "유리돔 식물원" }, { id: "buyongpavilion", name: "부용 누각 · A" }, { id: "hyangwonjeong", name: "향원 육각 누각 · B" }, { id: "gwallamjeong", name: "부채정 · 관람정 모티프 · C" }, { id: "citadel", name: "해자 성채" }, { id: "cathedral", name: "대성당" }, { id: "moonpavilion", name: "달빛 누각" }, { id: "moonbridge_layered", name: "달빛 개울다리 · 겹쌓기" }, { id: "moonbridge", name: "달빛 개울다리" }, { id: "windmill", name: "풍차" }, { id: "cart", name: "수레" }, { id: "cottage_kit", name: "오두막" }, { id: "well", name: "우물" },
+const KITS = [{ id: "canal_library", name: "운하 대도서관" }, { id: "terrace_monastery", name: "테라스 수도원" }, { id: "bridge_guildhall", name: "아치교 위 목조 길드회관" }, { id: "watergate", name: "기계 수문탑" }, { id: "railway_terminal", name: "대시계 철도역" }, { id: "courtyardpalace", name: "다층 처마 궁궐" }, { id: "botanical_conservatory", name: "유리돔 식물원" }, { id: "buyongpavilion", name: "부용 누각 · A" }, { id: "hyangwonjeong", name: "향원 육각 누각 · B" }, { id: "gwallamjeong", name: "부채정 · 관람정 모티프 · C" }, { id: "citadel", name: "해자 성채" }, { id: "cathedral", name: "대성당" }, { id: "moonpavilion", name: "달빛 누각" }, { id: "moonbridge_layered", name: "달빛 개울다리 · 겹쌓기" }, { id: "moonbridge", name: "달빛 개울다리" }, { id: "windmill", name: "풍차" }, { id: "cart", name: "수레" }, { id: "cottage_kit", name: "오두막" }, { id: "well", name: "우물" },
               { id: "mill", name: "방앗간" }, { id: "carousel", name: "회전목마" }, { id: "ferris", name: "관람차" },
               { id: "lighthouse", name: "등대" }, { id: "gate", name: "성문" }, { id: "clocktower", name: "시계탑" }, { id: "crane", name: "크레인" }, { id: "ship", name: "범선" },
               { id: "viking", name: "바이킹" }, { id: "beam", name: "빔 엔진" }, { id: "treehouse", name: "나무 위 집" }, { id: "observatory", name: "천문대" }, { id: "train", name: "기관차" },
@@ -751,7 +754,8 @@ const KITS = [{ id: "watergate", name: "기계 수문탑" }, { id: "railway_term
 // ---------- 마을 (키트 줄 맨 앞 칸): 판 바닥 위 제자리에 지은 건물이 서고, 안 지은 자리는 흐린 실루엣. 건물을 누르면 그 키트를 조립대에.
 // 다 지으면 (완성) 마을에 섬. 자동 조립 단추 = 안 지은 건물을 판 하나씩 위에서 내려 끼워 보여 줌 (기록 안 함)
 const rnd = seed => () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };   // 씨앗 난수 (나무·배치)
-const VILLAGE = { x0:-410, x1:1210, z0:-570, z1:410, slots:[
+const VILLAGE = { x0:-410, x1:1250, z0:-860, z1:410, slots:[
+  {kit:"canal_library",x:540,z:-720,rot:0}, {kit:"terrace_monastery",x:820,z:-720,rot:0}, {kit:"bridge_guildhall",x:1100,z:-720,rot:0},
   // The market is an old, irregular village; the eastern lanes are its planned extension.
   {kit:"cathedral",x:540,z:-450,rot:0}, {kit:"citadel",x:820,z:-450,rot:0}, {kit:"watergate",x:1100,z:-450,rot:0},
   {kit:"market_tower",x:-125,z:-145,rot:0}, {kit:"chapel",x:35,z:-178,rot:0},
@@ -764,6 +768,8 @@ const VILLAGE = { x0:-410, x1:1210, z0:-570, z1:410, slots:[
   {kit:"tower_mill",x:-335,z:-190,rot:0}],
   // Width, centreline, surface. Forecourts meet the existing building bases.
   roads:[
+    [22,[[435,-580],[1215,-580]]], [24,[[700,-860],[700,-580],[700,-310]]],
+    [16,[[540,-614.2],[540,-580]]], [16,[[820,-629.2],[820,-580]]], [16,[[1100,-636.2],[1100,-580]]],
     [22,[[1100,-368],[1100,-310],[820,-310]]],
     [28,[[110,410],[110,300],[115,235],[95,160],[65,110]]],
     [14,[[105,20],[265,20],[350,0],[700,0],[1210,0]]],
@@ -797,7 +803,7 @@ const VILLAGE = { x0:-410, x1:1210, z0:-570, z1:410, slots:[
   greens:[[-265,-466,112,67],[15,-495,153,43],[-329,10,60,73],[-343,273,45,81],
           [550,-35,115,22],[550,35,115,22],[845,-35,110,22],[845,35,110,22],
           [550,342,100,39],[850,342,95,39]],
-  wallGaps:{north:[],south:[[110,38],[700,20]],west:[],east:[[-150,23],[0,20],[150,23]],
+  wallGaps:{north:[[700,25]],south:[[110,38],[700,20]],west:[],east:[[-150,23],[0,20],[150,23]],
             inner:[[-295,32],[-150,23],[0,34],[150,23],[285,19]]}
 };
 {
@@ -1267,7 +1273,7 @@ function layoutModules() {                                            // 바닥 
     place[m] = v;
   }
   for (const m of KIT.modules) {
-    MOD[m] = { joined: m === KIT.base, off: place[m] };
+    MOD[m] = { joined: !!KIT.onsite || m === KIT.base, off: place[m] };
     if (m === KIT.base) continue;
     const b = document.createElement("button"); b.type = "button"; b.className = "icon join"; b.dataset.m = m; b.hidden = true;
     b.addEventListener("click", () => MOD[m].joined ? split(m) : join(m)); stage.appendChild(b); MOD[m].btn = b;
@@ -1654,8 +1660,8 @@ window.addEventListener("keydown", e => {
 
 const fmt = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 function startClock() { started = performance.now(); timer = setInterval(() => $("s-time").textContent = fmt(Math.floor((performance.now() - started) / 1000)), 500); }
-function frameWatergate() {
-  if (KIT?.design !== "watergate") return;
+function frameArchitecturalKit() {
+  if (!["watergate", "canal_library", "terrace_monastery", "bridge_guildhall"].includes(KIT?.design)) return;
   const box=new THREE.Box3();
   for(const s of Object.values(slots))box.union(boxOf(s,offOf(s.module)));
   const c=box.getCenter(new THREE.Vector3()),vf=THREE.MathUtils.degToRad(camera.fov/2),hf=Math.atan(Math.tan(vf)*camera.aspect);
@@ -1670,14 +1676,14 @@ function finish() {
   if (VKITS.has(kitId)) { BUILT.add(kitId); saveBuilt(); }
   $("b-tomap").hidden = !VKITS.has(kitId);
   $("done").hidden = false; $("live").textContent = "완성";
-  sfx("done"); startMotion(); frameWatergate();
+  sfx("done"); startMotion(); frameArchitecturalKit();
 }
 function reset() {
   $("live").textContent = "";
   stopBridgeCycle(); stopMotion(); clearOuts(); placed.clear(); bridgeState=newBridgeState(); selected = null; stats = { miss: 0, hint: 0 }; clearInterval(timer); started = 0; demoRun = false;
-  for (const m of KIT.modules) MOD[m].joined = m === KIT.base;                                // 덩어리는 다시 탁자 위 제자리로
+  for (const m of KIT.modules) MOD[m].joined = !!KIT.onsite || m === KIT.base;                                // 덩어리는 다시 탁자 위 제자리로
   for (const s of Object.values(slots)) { s.mesh.visible = false; s.ghost.visible = true; }
-  poseAll(); flights.length = 0; controls.autoRotate = false; $("done").hidden = true; $("s-time").textContent = "0:00"; refresh(); frameWatergate();
+  poseAll(); flights.length = 0; controls.autoRotate = false; $("done").hidden = true; $("s-time").textContent = "0:00"; refresh(); frameArchitecturalKit();
 }
 $("b-reset").addEventListener("click", () => { stopDemo(); reset(); }); $("b-tomap").addEventListener("click", () => switchKit("map")); $("b-again").addEventListener("click", () => { stopDemo(); reset(); });
 
