@@ -174,6 +174,7 @@ body { background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, sans-
   <symbol id="i-map" viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5zM3 8v8l9 5 9-5V8M12 13v8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-inn" viewBox="0 0 24 24"><path d="M3 11l6-6h6l6 6M5 10v10h14V10M9 20v-5h3v5M14 13h3v3h-3M17 5v3M19 15h2v4h-2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-bakery" viewBox="0 0 24 24"><path d="M10 10l5-5 6 6M12 9v11h8V10M15 20v-4h2v4M3 20v-5a4 4 0 0 1 8 0v5zM5.5 20v-3h3v3M2 20h20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-watergate" viewBox="0 0 24 24"><path d="M2 22h20M3 22V7h5v15m8 0V7h5v15M1 7l4.5-5L10 7m4 0 4.5-5L23 7M8 10h8M9 21V12h6v9m-4-8v8m2-8v8M8 5h8M10 5V2h4v3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
   <symbol id="i-citadel" viewBox="0 0 24 24"><path d="M3 21V6h3V3h3v3h6V3h3v3h3v15H3M3 10h18M9 21v-6a3 3 0 0 1 6 0v6M9 10V8h6v2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
   <symbol id="i-cathedral" viewBox="0 0 24 24"><path d="M3 21V10l6-5 6 5v11M6 21v-7h6v7M15 21V7h6v14M15 7l3-6 3 6M18 10v3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9" cy="10" r="2" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
 <symbol id="i-chapel" viewBox="0 0 24 24"><path d="M4 13l8-6 8 6M6 12v9h12v-9M10 21v-4a2 2 0 0 1 4 0v4M12 7V2.5M10.5 4h3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
@@ -239,7 +240,7 @@ body { background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, sans-
 
 <script>
 const $ = id => document.getElementById(id);
-const DATA_V = "48-village";                                                    // 키트 자료 판 (바꿔 올릴 때 올림: 브라우저에 남은 옛 자료와 섞이지 않게)
+const DATA_V = "49-watergate";                                                    // 키트 자료 판 (바꿔 올릴 때 올림: 브라우저에 남은 옛 자료와 섞이지 않게)
 const cssColor = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 let KIT, slots = {}, placed = new Set(), selected = null, stats = { miss: 0, hint: 0 }, timer = null, started = 0;
 
@@ -331,22 +332,22 @@ function bridgeButton() {
   if(l&&bridgeState){
     lockButton.disabled=bridgeState.busy||flights.length>0||[...l.supports,...l.slide_parts].some(q=>!placed.has(q));
     const title=bridgeState.barWork?'잠금 해제':'잠금';
-    if(lockButton.title!==title){lockButton.title=title;lockButton.setAttribute('aria-label','도개교 '+title);lockButton.querySelector('span').textContent=title;}
+    if(lockButton.title!==title){lockButton.title=title;lockButton.setAttribute('aria-label',(l.label||'도개교')+' '+title);lockButton.querySelector('span').textContent=title;}
   }
   const run=$("b-cycle"),complete=!!l && !!bridgeState && placed.size===KIT.plates && allJoined();
   run.hidden=!l || mapOn || (!complete&&!bridgeCycle);
   run.disabled=!bridgeCycle && (!complete || bridgeState?.busy || flights.length>0);
   const running=bridgeCycle&&!bridgeCycle.paused;
-  const title=bridgeCycle?(running?"작동 멈춤":"작동 계속"):"도개교 작동";
+  const title=bridgeCycle?(running?"작동 멈춤":"작동 계속"):(l?.label||"도개교")+" 작동";
   if(run.title!==title){
     run.title=title;run.setAttribute("aria-label",title);run.setAttribute("aria-pressed",String(!!running));
     run.querySelector("span").textContent=bridgeCycle?(running?"멈춤":"계속"):"작동";
     run.querySelector("use").setAttribute("href",running?"#i-stop":"#i-play");
   }
   if (!l || !bridgeState) return;
-  b.disabled=bridgeState.busy || flights.length>0 || !MOD.bridge?.joined ||
+  b.disabled=bridgeState.busy || flights.length>0 || l.parts.some(q=>!MOD[slots[q].module]?.joined) ||
     [...l.parts,...l.supports].some(q=>!placed.has(q));
-  b.title=bridgeState.raised ? "도개교 내리기" : "도개교 올리기";
+  b.title=(l.label||"도개교")+(bridgeState.raised ? " 내리기" : " 올리기");
   b.setAttribute("aria-label",b.title);b.setAttribute("aria-pressed",String(bridgeState.raised));
 }
 function bridgePose(s,W) {
@@ -389,8 +390,17 @@ function moveBridge() {
   const frame=now=>{
     if (!KIT?.bridgeLock || bridgeState!==operation) return;
     const t=Math.min(1,(now-start)/duration),e=t*t*(3-2*t),angle=(from+(to-from)*e)*Math.PI/180;
-    const S=turnAbout(new THREE.Vector3(...l.pivot),new THREE.Vector3(...l.axis),angle);
-    for (const q of l.parts) bridgePose(slots[q],S.clone().multiply(slots[q].restBase));
+    if(l.motion_groups){
+      const f=angle/(l.angle*Math.PI/180);
+      for(const g of l.motion_groups){
+        const M=g.translation?new THREE.Matrix4().makeTranslation(...g.translation.map(v=>v*f)):
+          turnAbout(new THREE.Vector3(...g.pivot),new THREE.Vector3(...g.axis),THREE.MathUtils.degToRad(g.degrees)*f);
+        for(const q of g.parts)bridgePose(slots[q],M.clone().multiply(slots[q].restBase));
+      }
+    }else{
+      const S=turnAbout(new THREE.Vector3(...l.pivot),new THREE.Vector3(...l.axis),angle);
+      for(const q of l.parts)bridgePose(slots[q],S.clone().multiply(slots[q].restBase));
+    }
     if (t<1) return requestAnimationFrame(frame);
     bridgeState.raised=opening;bridgeState.busy=false;syncBridgeState();sfx("place");
   };
@@ -405,8 +415,9 @@ function moveBolt() {
   const owner=bridgeState,from=bridgeState.barWork?1:0,to=1-from,start=performance.now(),duration=bridgeCycle?650/SPEED:650;
   const frame=now=>{
     if(!KIT?.bridgeLock||bridgeState!==owner)return;
-    const t=Math.min(1,(now-start)/duration),e=t*t*(3-2*t),x=-l.stroke*(from+(to-from)*e);
-    for(const q of l.slide_parts)bridgePose(slots[q],new THREE.Matrix4().makeTranslation(x,0,0).multiply(slots[q].restBase));
+    const t=Math.min(1,(now-start)/duration),e=t*t*(3-2*t),f=from+(to-from)*e;
+    const d=(l.slide_vector||[-l.stroke,0,0]).map(v=>v*f);
+    for(const q of l.slide_parts)bridgePose(slots[q],new THREE.Matrix4().makeTranslation(...d).multiply(slots[q].restBase));
     if(t<1)return requestAnimationFrame(frame);
     bridgeState.barWork=bridgeState.pinWork=!!to;bridgeState.busy=false;syncBridgeState();sfx('place');
   };requestAnimationFrame(frame);
@@ -728,7 +739,7 @@ function stepMotion(now) {
 }
 
 // ---------- 키트 (소품마다 data/<id>/): 고르면 조립대를 비우고 새로 깖
-const KITS = [{ id: "railway_terminal", name: "대시계 철도역" }, { id: "courtyardpalace", name: "다층 처마 궁궐" }, { id: "botanical_conservatory", name: "유리돔 식물원" }, { id: "buyongpavilion", name: "부용 누각 · A" }, { id: "hyangwonjeong", name: "향원 육각 누각 · B" }, { id: "gwallamjeong", name: "부채정 · 관람정 모티프 · C" }, { id: "citadel", name: "해자 성채" }, { id: "cathedral", name: "대성당" }, { id: "moonpavilion", name: "달빛 누각" }, { id: "moonbridge_layered", name: "달빛 개울다리 · 겹쌓기" }, { id: "moonbridge", name: "달빛 개울다리" }, { id: "windmill", name: "풍차" }, { id: "cart", name: "수레" }, { id: "cottage_kit", name: "오두막" }, { id: "well", name: "우물" },
+const KITS = [{ id: "watergate", name: "기계 수문탑" }, { id: "railway_terminal", name: "대시계 철도역" }, { id: "courtyardpalace", name: "다층 처마 궁궐" }, { id: "botanical_conservatory", name: "유리돔 식물원" }, { id: "buyongpavilion", name: "부용 누각 · A" }, { id: "hyangwonjeong", name: "향원 육각 누각 · B" }, { id: "gwallamjeong", name: "부채정 · 관람정 모티프 · C" }, { id: "citadel", name: "해자 성채" }, { id: "cathedral", name: "대성당" }, { id: "moonpavilion", name: "달빛 누각" }, { id: "moonbridge_layered", name: "달빛 개울다리 · 겹쌓기" }, { id: "moonbridge", name: "달빛 개울다리" }, { id: "windmill", name: "풍차" }, { id: "cart", name: "수레" }, { id: "cottage_kit", name: "오두막" }, { id: "well", name: "우물" },
               { id: "mill", name: "방앗간" }, { id: "carousel", name: "회전목마" }, { id: "ferris", name: "관람차" },
               { id: "lighthouse", name: "등대" }, { id: "gate", name: "성문" }, { id: "clocktower", name: "시계탑" }, { id: "crane", name: "크레인" }, { id: "ship", name: "범선" },
               { id: "viking", name: "바이킹" }, { id: "beam", name: "빔 엔진" }, { id: "treehouse", name: "나무 위 집" }, { id: "observatory", name: "천문대" }, { id: "train", name: "기관차" },
@@ -740,9 +751,9 @@ const KITS = [{ id: "railway_terminal", name: "대시계 철도역" }, { id: "co
 // ---------- 마을 (키트 줄 맨 앞 칸): 판 바닥 위 제자리에 지은 건물이 서고, 안 지은 자리는 흐린 실루엣. 건물을 누르면 그 키트를 조립대에.
 // 다 지으면 (완성) 마을에 섬. 자동 조립 단추 = 안 지은 건물을 판 하나씩 위에서 내려 끼워 보여 줌 (기록 안 함)
 const rnd = seed => () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };   // 씨앗 난수 (나무·배치)
-const VILLAGE = { x0:-410, x1:990, z0:-570, z1:410, slots:[
+const VILLAGE = { x0:-410, x1:1210, z0:-570, z1:410, slots:[
   // The market is an old, irregular village; the eastern lanes are its planned extension.
-  {kit:"cathedral",x:540,z:-450,rot:0}, {kit:"citadel",x:820,z:-450,rot:0},
+  {kit:"cathedral",x:540,z:-450,rot:0}, {kit:"citadel",x:820,z:-450,rot:0}, {kit:"watergate",x:1100,z:-450,rot:0},
   {kit:"market_tower",x:-125,z:-145,rot:0}, {kit:"chapel",x:35,z:-178,rot:0},
   {kit:"smithy",x:175,z:-145,rot:0}, {kit:"bakery",x:-195,z:10,rot:1},
   {kit:"inn",x:-160,z:165,rot:1}, {kit:"townhouse",x:180,z:80,rot:3},
@@ -753,10 +764,11 @@ const VILLAGE = { x0:-410, x1:990, z0:-570, z1:410, slots:[
   {kit:"tower_mill",x:-335,z:-190,rot:0}],
   // Width, centreline, surface. Forecourts meet the existing building bases.
   roads:[
+    [22,[[1100,-368],[1100,-310],[820,-310]]],
     [28,[[110,410],[110,300],[115,235],[95,160],[65,110]]],
-    [14,[[105,20],[265,20],[350,0],[700,0],[978,0]]],
-    [28,[[245,-150],[430,-150],[700,-150],[990,-150]]],
-    [28,[[245,150],[430,150],[700,150],[990,150]]],
+    [14,[[105,20],[265,20],[350,0],[700,0],[1210,0]]],
+    [28,[[245,-150],[430,-150],[700,-150],[1210,-150]]],
+    [28,[[245,150],[430,150],[700,150],[1210,150]]],
     [24,[[700,-310],[700,-150],[700,0],[700,150],[700,285],[700,410]]],
     [22,[[245,-150],[270,-235],[320,-260],[382,-260],[382,-290],[435,-310],[900,-310]]],
     [18,[[110,-35],[110,-225],[100,-265]]],
