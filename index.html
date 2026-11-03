@@ -61,6 +61,7 @@ body { background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, sans-
 .icon .spd { font: 700 12px/1 system-ui, sans-serif; letter-spacing: -0.02em; }
 .icon { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 19px; border: 1px solid var(--line); background: color-mix(in srgb, var(--bg) 85%, transparent); color: var(--ink); cursor: pointer; padding: 0; }
 .icon svg { width: 18px; height: 18px; }
+#b-bridge[hidden] { display: none; }
 .icon[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
 .icon .spd { font: 700 12px/1 system-ui, sans-serif; letter-spacing: -0.02em; }
 .icon:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -136,6 +137,9 @@ body { background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, sans-
   <symbol id="i-join" viewBox="0 0 24 24"><path d="M5 4h6v6M19 20h-6v-6M11 4L4 11M13 20l7-7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 15l6-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
   <symbol id="i-split" viewBox="0 0 24 24"><path d="M4 10V4h6M20 14v6h-6M4 4l6 6M20 20l-6-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-hyangwonjeong" viewBox="0 0 24 24"><path d="M2 21h20M4 19V9m16 10V9M4 14h16M7 19v-5m10 5v-5M2 9l5-3 5-4 5 4 5 3H2Zm5 3h10M8 12V9m8 3V9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+  <symbol id="i-railway_terminal" viewBox="0 0 24 24"><path d="M2 21h20M3 21V10l5-4h8l5 4v11M8 6V3h8v3M9 21v-7h6v7M4 12h3m10 0h3M4 16h3m10 0h3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="8" r="2" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
+  <symbol id="i-courtyardpalace" viewBox="0 0 24 24"><path d="M2 21h20M3 11l4-2 5-6 5 6 4 2M4 11h16M5 12v9M19 12v9M9 21v-6h6v6M2 16h5m10 0h5M2 16l3-3m14 0 3 3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-botanical_conservatory" viewBox="0 0 24 24"><path d="M2 21h20M4 21V11a8 8 0 0 1 16 0v10M4 11h16M12 3v18M8 21V11c0-4 2-8 4-8s4 4 4 8v10M2 21v-7h2m16 0h2v7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-buyongpavilion" viewBox="0 0 24 24"><path d="M2 12l5-3 5-6 5 6 5 3M3 12h18M7 9l5 3 5-3M5 13v7M19 13v7M9 14v6M15 14v6M3 20h18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-gwallamjeong" viewBox="0 0 24 24"><path d="M3 20q9 4 18 0M5 19V11m14 8v-8M2 10q10 5 20 0L12 2 2 10Zm10-8v11M5 15q7 4 14 0M8 17v4m8-4v4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
   <symbol id="i-moonpavilion" viewBox="0 0 24 24"><path d="M2 22h20M4 20V11m16 9v-9M8 20v-5m8 5v-5M2 11l5-4h10l5 4H2Zm4-6 6-3 6 3H6Zm3 2V5m6 2V5M4 13h16M4 17h4m8 0h4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
@@ -225,7 +229,7 @@ body { background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, sans-
 
 <script>
 const $ = id => document.getElementById(id);
-const DATA_V = "42-lock";                                                    // 키트 자료 판 (바꿔 올릴 때 올림: 브라우저에 남은 옛 자료와 섞이지 않게)
+const DATA_V = "43-architecture";                                                    // 키트 자료 판 (바꿔 올릴 때 올림: 브라우저에 남은 옛 자료와 섞이지 않게)
 const cssColor = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 let KIT, slots = {}, placed = new Set(), selected = null, stats = { miss: 0, hint: 0 }, timer = null, started = 0;
 
@@ -619,7 +623,7 @@ function stepMotion(now) {
 }
 
 // ---------- 키트 (소품마다 data/<id>/): 고르면 조립대를 비우고 새로 깖
-const KITS = [{ id: "buyongpavilion", name: "부용 누각 · A" }, { id: "hyangwonjeong", name: "향원 육각 누각 · B" }, { id: "gwallamjeong", name: "부채정 · 관람정 모티프 · C" }, { id: "citadel", name: "해자 성채" }, { id: "cathedral", name: "대성당" }, { id: "moonpavilion", name: "달빛 누각" }, { id: "moonbridge_layered", name: "달빛 개울다리 · 겹쌓기" }, { id: "moonbridge", name: "달빛 개울다리" }, { id: "windmill", name: "풍차" }, { id: "cart", name: "수레" }, { id: "cottage_kit", name: "오두막" }, { id: "well", name: "우물" },
+const KITS = [{ id: "railway_terminal", name: "대시계 철도역" }, { id: "courtyardpalace", name: "다층 처마 궁궐" }, { id: "botanical_conservatory", name: "유리돔 식물원" }, { id: "buyongpavilion", name: "부용 누각 · A" }, { id: "hyangwonjeong", name: "향원 육각 누각 · B" }, { id: "gwallamjeong", name: "부채정 · 관람정 모티프 · C" }, { id: "citadel", name: "해자 성채" }, { id: "cathedral", name: "대성당" }, { id: "moonpavilion", name: "달빛 누각" }, { id: "moonbridge_layered", name: "달빛 개울다리 · 겹쌓기" }, { id: "moonbridge", name: "달빛 개울다리" }, { id: "windmill", name: "풍차" }, { id: "cart", name: "수레" }, { id: "cottage_kit", name: "오두막" }, { id: "well", name: "우물" },
               { id: "mill", name: "방앗간" }, { id: "carousel", name: "회전목마" }, { id: "ferris", name: "관람차" },
               { id: "lighthouse", name: "등대" }, { id: "gate", name: "성문" }, { id: "clocktower", name: "시계탑" }, { id: "crane", name: "크레인" }, { id: "ship", name: "범선" },
               { id: "viking", name: "바이킹" }, { id: "beam", name: "빔 엔진" }, { id: "treehouse", name: "나무 위 집" }, { id: "observatory", name: "천문대" }, { id: "train", name: "기관차" },
@@ -1015,7 +1019,11 @@ async function loadKit(id) {
   const c = box.getCenter(new THREE.Vector3());
   const vf = THREE.MathUtils.degToRad(camera.fov / 2), hf = Math.atan(Math.tan(vf) * camera.aspect);   // 세로 화면이면 가로 시야로 맞춤
   const sz = box.getSize(new THREE.Vector3()), halfW = Math.max(sz.x, sz.z) / 2, halfH = sz.y / 2;
-  const dist = Math.max(halfW / Math.tan(hf), halfH / Math.tan(vf)) * 1.08 + halfW, r = dist;
+  const legacyDist = Math.max(halfW / Math.tan(hf), halfH / Math.tan(vf)) * 1.08 + halfW;
+  // New architectural kits need their near lower corners to fit throughout orbit.
+  const dist = ["railway_terminal", "courtyardpalace", "botanical_conservatory"].includes(KIT.design)
+    ? Math.max(legacyDist, sz.length() / 2 / Math.sin(Math.min(vf, hf)) * 1.08)
+    : legacyDist, r = dist;
   controls.target.copy(c); camera.position.copy(c).addScaledVector(new THREE.Vector3(-Math.sin(0.7), 0.4, Math.cos(0.7)).normalize(), dist);
   camera.near = dist / 50; camera.far = dist * 20; camera.updateProjectionMatrix(); controls.update();
 }
@@ -1356,7 +1364,11 @@ function showPage(i) {
   M.arrows.updateMatrixWorld(true); box.expandByObject(M.arrows);
   const c = box.getCenter(new THREE.Vector3()), sz = box.getSize(new THREE.Vector3());
   const vf = THREE.MathUtils.degToRad(M.camera.fov / 2), hf = Math.atan(Math.tan(vf) * M.camera.aspect);
-  const halfW = Math.max(sz.x, sz.z) / 2, dist = Math.max(halfW / Math.tan(hf), sz.y / 2 / Math.tan(vf)) * 1.15 + halfW;
+  const halfW = Math.max(sz.x, sz.z) / 2, legacyDist = Math.max(halfW / Math.tan(hf), sz.y / 2 / Math.tan(vf)) * 1.15 + halfW;
+  // The same new-kit guard includes this page's insertion arrows and orbit.
+  const dist = ["railway_terminal", "courtyardpalace", "botanical_conservatory"].includes(KIT.design)
+    ? Math.max(legacyDist, sz.length() / 2 / Math.sin(Math.min(vf, hf)) * 1.15)
+    : legacyDist;
   const dir = M.camera.position.clone().sub(M.controls.target).normalize();
   M.controls.target.copy(c); M.camera.position.copy(c).addScaledVector(dir, dist); M.controls.update();
   const counts = {};
