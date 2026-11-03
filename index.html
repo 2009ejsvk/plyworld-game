@@ -7,6 +7,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/renderers/Projector.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/renderers/SVGRenderer.js"></script>
 <style>
 /* 작업대: 왼쪽 (폰은 아래) = 레이저로 자른 자작 원판 (끼운 판은 빈 구멍으로 남음), 오른쪽 = 조립대. 글 대신 모양·색으로 말함 */
 :root {
@@ -46,7 +48,7 @@ body { background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, sans-
 @keyframes nudge { 0%,100% { box-shadow: inset 0 0 0 2px var(--sheet-edge); } 50% { box-shadow: inset 0 0 0 4px var(--accent); } }
 /* 조립대 */
 .stage { position: relative; min-height: 0; background: var(--stage); border-radius: 6px; overflow: hidden; touch-action: none; }
-.stage canvas { position: absolute; inset: 0; display: block; width: 100% !important; height: 100% !important; }   /* 캔버스 크기가 칸 크기를 밀어 올리지 않게 */
+.stage .view3d { position: absolute; inset: 0; display: block; width: 100% !important; height: 100% !important; }   /* 캔버스 크기가 칸 크기를 밀어 올리지 않게 */
 .bar { position: absolute; left: 0; right: 0; top: 0; height: 4px; background: color-mix(in srgb, var(--ink) 10%, transparent); }
 .bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .4s; }
 .hud { position: absolute; top: 12px; left: 12px; right: 12px; display: flex; flex-wrap: wrap; gap: 8px; row-gap: 6px; align-items: center; pointer-events: none; }   /* 넓지 않으면 도구가 다음 줄로 */
@@ -96,7 +98,7 @@ body { background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, sans-
 .m-dots button[aria-current="step"] { background: var(--accent); border-color: var(--accent); width: 22px; }
 .m-head .icon { margin-left: auto; }
 .m-view { position: relative; min-height: 0; overflow: hidden; }
-.m-view canvas { position: absolute; inset: 0; display: block; width: 100% !important; height: 100% !important; }
+.m-view .view3d { position: absolute; inset: 0; display: block; width: 100% !important; height: 100% !important; }
 .m-foot { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; padding: 8px 10px 12px; border-top: 1px dashed var(--line); }
 .m-parts { display: flex; flex-wrap: wrap; gap: 14px; justify-content: center; align-items: center; min-width: 0; }
 .m-part { position: relative; line-height: 0; }
@@ -220,9 +222,16 @@ let KIT, slots = {}, placed = new Set(), selected = null, stats = { miss: 0, hin
 
 // ---------- 3D 조립대
 const stage = $("stage");
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
-renderer.outputEncoding = THREE.sRGBEncoding; renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const SVG = /[?&]svg\b/.test(location.search) || !(() => { try { const c = document.createElement("canvas"); return c.getContext("webgl2") || c.getContext("webgl"); } catch (e) { return null; } })();
+function makeRenderer() {                                               // WebGL 이 없으면 (GPU 없는 에이전트 브라우저 등) three.js SVGRenderer 로 CPU 그리기: 그림자·질감 없음. ?svg 로 강제
+  let r;
+  if (!SVG) { r = new THREE.WebGLRenderer({ antialias: true }); r.setPixelRatio(Math.min(2, window.devicePixelRatio || 1)); r.outputEncoding = THREE.sRGBEncoding; }
+  else if (THREE.SVGRenderer) r = Object.assign(new THREE.SVGRenderer(), { capabilities: { getMaxAnisotropy: () => 1 }, shadowMap: {}, dispose() {} });
+  else { $("load").innerHTML = `<span style="color:var(--bad)">이 브라우저에서는 3D 를 그릴 수 없어요 (WebGL 꺼짐)</span>`; throw new Error("no WebGL"); }
+  r.domElement.classList.add("view3d"); return r;
+}
+const renderer = makeRenderer();
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 stage.prepend(renderer.domElement);
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(32, 1, 1, 20000);
@@ -232,6 +241,7 @@ sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -76
 scene.add(sun); const fill = new THREE.DirectionalLight(0xffffff, 0.35); fill.position.set(400, 200, -300); scene.add(fill);
 const ground = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.ShadowMaterial({ opacity: 0.16 }));
 ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
+if (SVG) { scene.add(new THREE.AmbientLight(new THREE.Color(0xfff6e8).multiplyScalar(0.45))); sun.intensity = 0.55; fill.intensity = 0.2; ground.visible = false; }   // SVG: 반구 빛·그림자 판을 못 그림 -> 고른 빛 (SVGRenderer 는 고른 빛의 세기를 안 봐서 색으로 줄임)
 const controls = new THREE.OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true; controls.dampingFactor = 0.12; controls.minPolarAngle = 0; controls.maxPolarAngle = Math.PI;   // 아래에서도 봄 (360 도)
 const ghostMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.12, depthWrite: false });
@@ -592,8 +602,20 @@ function glbScene(id) {                                               // 키트 
   return GLB[id] ||= fetch(`data/${id}/kit.glb64.json?v=${DATA_V}`).then(r => r.json()).then(pack => {
     const bin = atob(pack.glb), buf = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
-    return new Promise((ok, bad) => new THREE.GLTFLoader().parse(buf.buffer, "", g => ok(g.scene), bad));
+    return new Promise((ok, bad) => new THREE.GLTFLoader().parse(buf.buffer, "", g => ok(svgFix(g.scene)), bad));
   });
+}
+function svgFix(root) {                                               // SVG: 정점 색을 못 그림 -> 판마다 평균 색 하나 (탄 가장자리 무늬는 빠짐) + 빛 계산용 법선
+  if (!SVG) return root;
+  root.traverse(o => {
+    if (!o.isMesh) return;
+    const g = o.geometry, c = g.attributes.color; if (!g.attributes.normal) g.computeVertexNormals();
+    if (!c || !o.material.vertexColors) return;
+    const s = [0, 0, 0]; for (let i = 0; i < c.count; i++) { s[0] += c.getX(i); s[1] += c.getY(i); s[2] += c.getZ(i); }
+    const k = c.count * (!c.normalized ? 1 : c.array instanceof Uint8Array ? 255 : c.array instanceof Uint16Array ? 65535 : 1);   // r128 getX 는 정규화된 정수를 그대로 돌려줌
+    o.material = o.material.clone(); o.material.vertexColors = false; o.material.color.setRGB(s[0] / k, s[1] / k, s[2] / k).convertLinearToSRGB();
+  });
+  return root;
 }
 const birchMat = new THREE.MeshStandardMaterial({ color: 0xe2cca8, roughness: 0.85, metalness: 0 });
 const burnMat = new THREE.MeshStandardMaterial({ color: 0x9a6a40, roughness: 0.9, metalness: 0 });
@@ -752,7 +774,7 @@ function fitMap() {                                                   // 앞 모
 async function buildMap() {
   mapRoot = new THREE.Group(); scene.add(mapRoot);
   const { x0, x1, z0, z1 } = VILLAGE, W = x1 - x0, D = z1 - z0, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, T = 14;
-  const top = new THREE.MeshStandardMaterial({ map: groundTex(), roughness: 0.88, metalness: 0 });
+  const top = new THREE.MeshStandardMaterial(SVG ? { color: 0xc8b08a, roughness: 0.88, metalness: 0 } : { map: groundTex(), roughness: 0.88, metalness: 0 });   // SVG 는 무늬 (질감) 를 못 그림
   const board = new THREE.Mesh(new THREE.BoxGeometry(W, T, D), [burnMat, burnMat, top, burnMat, burnMat, burnMat]);
   board.position.set(cx, -T / 2 - 0.01, cz); board.receiveShadow = true; mapRoot.add(board);
   const lip = cut(new THREE.BoxGeometry(W + 10, 4, D + 10), birchMat); lip.position.set(cx, -T - 2, cz); mapRoot.add(lip);
@@ -761,14 +783,15 @@ async function buildMap() {
   const SC = Object.fromEntries(await Promise.all([...VKITS].map(id => glbScene(id).then(sc => [id, sc], () => [id, null]))));   // 아직 안 올라간 키트는 자리만 비움
   VILLAGE.slots.forEach((v, i) => {
     if (!SC[v.kit]) return;
-    const src = SC[v.kit], solid = src.clone(true), ghost = src.clone(true);
+    const src = SC[v.kit], solid = src.clone(true); let ghost = SVG ? null : src.clone(true);
     solid.traverse(o => { if (o.isMesh) { o.material = o.material.clone(); Object.assign(o.material, { side: THREE.DoubleSide, metalness: 0, roughness: 0.82 }); o.castShadow = o.receiveShadow = true; } });
-    ghost.traverse(o => { if (o.isMesh) { o.material = mapGhostMat; o.castShadow = false; o.renderOrder = 2; } });
+    if (ghost) ghost.traverse(o => { if (o.isMesh) { o.material = mapGhostMat; o.castShadow = false; o.renderOrder = 2; } });
     solid.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(solid), c = box.getCenter(new THREE.Vector3());
-    const drop = new THREE.Group(); drop.add(solid, ghost);                               // 건물 한 채 (판 + 실루엣)
-    for (const o of [solid, ghost]) o.position.sub(new THREE.Vector3(c.x, box.min.y, c.z));       // glTF 뿌리의 제 자리는 두고 밀기
+    for (const o of [solid, ghost]) if (o) o.position.sub(new THREE.Vector3(c.x, box.min.y, c.z));   // glTF 뿌리의 제 자리는 두고 밀기
     const sz = box.getSize(new THREE.Vector3()), hit = new THREE.Mesh(new THREE.BoxGeometry(sz.x, sz.y, sz.z), hitMat); hit.position.y = sz.y / 2;   // 누를 자리 (판 사이 틈도)
+    if (!ghost) { ghost = new THREE.Mesh(new THREE.BoxGeometry(sz.x, sz.y, sz.z), mapGhostMat); ghost.position.y = sz.y / 2; ghost.renderOrder = 2; }   // SVG: 실루엣은 상자 하나 (판 수만 장을 CPU 로는 못 그림)
+    const drop = new THREE.Group(); drop.add(solid, ghost);                               // 건물 한 채 (판 + 실루엣)
     const holder = new THREE.Group(); holder.add(drop, hit); v.hit = hit; holder.position.set(v.x, 0, v.z); holder.rotation.y = v.rot * Math.PI / 2;
     holder.userData.slot = i; Object.assign(v, { holder, solid, ghost }); mapRoot.add(holder);
   });
@@ -878,7 +901,7 @@ async function loadKit(id) {
   for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
   const gltf = await new Promise((ok, bad) => new THREE.GLTFLoader().parse(buf.buffer, "", ok, bad));
   kitRoot = new THREE.Group(); scene.add(kitRoot);
-  kitRoot.add(gltf.scene); gltf.scene.updateMatrixWorld(true);
+  kitRoot.add(svgFix(gltf.scene)); gltf.scene.updateMatrixWorld(true);
   for (const p of meta.parts) {
     const node = gltf.scene.getObjectByName(p.id), mesh = node.isMesh ? node : node.getObjectByProperty("isMesh", true);
     Object.assign(mesh.material, { side: THREE.DoubleSide, metalness: 0, roughness: 0.82 }); mesh.castShadow = mesh.receiveShadow = true;
@@ -1165,8 +1188,7 @@ $("b-ghost").addEventListener("click", e => {
 const M = { page: 0, built: false };
 function buildManual() {
   const view = $("m-view");
-  M.renderer = new THREE.WebGLRenderer({ antialias: true }); M.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
-  M.renderer.outputEncoding = THREE.sRGBEncoding; view.appendChild(M.renderer.domElement);
+  M.renderer = makeRenderer(); view.appendChild(M.renderer.domElement);
   M.scene = new THREE.Scene(); M.camera = camera.clone();
   M.scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8170, 0.9));
   const l = new THREE.DirectionalLight(0xffffff, 0.8); l.position.set(-300, 600, 450); M.scene.add(l);
@@ -1328,6 +1350,7 @@ function showDone() {                                                  // 완성
 }
 $("b-skip").addEventListener("click", showDone);
 
+let svgNext = 0;
 (function loop(now) {
   for (let i = 0; i < flights.length;) {                                                        // 앞에서부터: 같은 판이면 나중 움직임이 이김 (화면이 멈췄다 와도 들기 -> 내리기 순서 그대로)
     const f = flights[i]; if (now < f.t0) { i++; continue; }                                    // 차례를 기다리는 움직임
@@ -1338,8 +1361,12 @@ $("b-skip").addEventListener("click", showDone);
   if (motion) stepMotion(now);
   if (drops.length) stepDrops(now);
   updateBand(); updateBought(); updateBucket(); updateCords();
-  controls.update(); renderer.render(scene, camera); placeButtons();
-  if (M.built && !$("manual").hidden) { M.controls.update(); M.renderer.render(M.scene, M.camera); }
+  controls.update(); const man = M.built && !$("manual").hidden; if (man) M.controls.update();
+  if (!SVG || now >= svgNext) {                                                                 // SVG (CPU): 그리는 데 든 시간의 3 배 쉬고 다시 그림
+    const t = performance.now(); renderer.render(scene, camera); if (man) M.renderer.render(M.scene, M.camera);
+    svgNext = now + Math.max(100, (performance.now() - t) * 3);
+  }
+  placeButtons();
   requestAnimationFrame(loop);
 })(performance.now());
 
