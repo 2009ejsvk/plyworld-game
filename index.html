@@ -1,0 +1,1352 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>판재 조립</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<style>
+/* 작업대: 왼쪽 (폰은 아래) = 레이저로 자른 자작 원판 (끼운 판은 빈 구멍으로 남음), 오른쪽 = 조립대. 글 대신 모양·색으로 말함 */
+:root {
+  --bg: #e9e7e0; --ink: #1f2420; --muted: #6b6f67; --line: #d3cfc4;
+  --sheet: #e7d4b0; --sheet-edge: #b98d5d; --birch: #f1e2c4; --burn: #6e4526; --hole: #cbb58f;
+  --accent: #8a4a1f; --bad: #b8402f; --wait: #c08a1b; --stage: #dedbd1; --ghost: #ffffff; --paper: #fbfaf6; --done: #c9c4b8;
+  --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #141715; --ink: #e9e6de; --muted: #9a9d94; --line: #303732;
+  --sheet: #5a4a33; --sheet-edge: #2f2619; --birch: #e3cda4; --burn: #4a2e18; --hole: #2a2219;
+  --accent: #e09a60; --bad: #ef7c66; --wait: #e2b44d; --stage: #222724; --ghost: #dfe6e0; --paper: #1c201e; --done: #9aa096; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #141715; --ink: #e9e6de; --muted: #9a9d94; --line: #303732;
+  --sheet: #5a4a33; --sheet-edge: #2f2619; --birch: #e3cda4; --burn: #4a2e18; --hole: #2a2219;
+  --accent: #e09a60; --bad: #ef7c66; --wait: #e2b44d; --stage: #222724; --ghost: #dfe6e0; --paper: #1c201e; --done: #9aa096; color-scheme: dark }
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, sans-serif; }
+.app { height: 100%; box-sizing: border-box; display: grid; grid-template-columns: minmax(200px, 300px) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); gap: 10px;
+  padding-block: 10px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+/* 원판: 판 모양이 잘린 합판 한 장 */
+.sheet { min-height: 0; overflow: auto; background: var(--sheet); border-radius: 6px; box-shadow: inset 0 0 0 2px var(--sheet-edge);
+  padding: 12px; display: flex; flex-wrap: wrap; gap: 10px; align-content: flex-start; justify-content: center; }
+.part { position: relative; padding: 4px; border: 0; background: none; border-radius: 6px; cursor: pointer; line-height: 0; }
+.part svg { overflow: visible; display: block; }
+.part .fill { fill: var(--birch); stroke: var(--burn); stroke-width: 1.2; }
+.part[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--accent); }
+.part:disabled { cursor: default; }
+.part:disabled .fill { fill: var(--hole); stroke: var(--sheet-edge); stroke-dasharray: 3 3; }       /* 다 끼운 판 = 원판에 남은 빈 구멍 */
+.part:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.part .n { position: absolute; right: -2px; top: -2px; min-width: 18px; height: 18px; border-radius: 9px; background: var(--burn); color: var(--birch);
+  font: 500 11px/18px var(--mono); text-align: center; padding: 0 4px; }
+.part:disabled .n, .part .n:empty { display: none; }
+.part.shake { animation: shake .3s; }
+@keyframes shake { 0%,100% { transform: none; } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+.sheet.nudge { animation: nudge .5s; }
+@keyframes nudge { 0%,100% { box-shadow: inset 0 0 0 2px var(--sheet-edge); } 50% { box-shadow: inset 0 0 0 4px var(--accent); } }
+/* 조립대 */
+.stage { position: relative; min-height: 0; background: var(--stage); border-radius: 6px; overflow: hidden; touch-action: none; }
+.stage canvas { position: absolute; inset: 0; display: block; width: 100% !important; height: 100% !important; }   /* 캔버스 크기가 칸 크기를 밀어 올리지 않게 */
+.bar { position: absolute; left: 0; right: 0; top: 0; height: 4px; background: color-mix(in srgb, var(--ink) 10%, transparent); }
+.bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .4s; }
+.hud { position: absolute; top: 12px; left: 12px; right: 12px; display: flex; flex-wrap: wrap; gap: 8px; row-gap: 6px; align-items: center; pointer-events: none; }   /* 넓지 않으면 도구가 다음 줄로 */
+.chip { display: inline-flex; gap: 5px; align-items: center; font: 500 13px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.chip svg { width: 15px; height: 15px; }
+.tools { margin-left: auto; display: flex; gap: 6px; pointer-events: auto; }
+.kits { display: flex; gap: 4px; padding: 3px; border-radius: 22px; min-width: 0; max-width: 100%; overflow-x: auto; scrollbar-width: none; background: color-mix(in srgb, var(--ink) 7%, transparent); pointer-events: auto; margin-right: 4px; }
+.kits .icon { width: 34px; height: 34px; border-color: transparent; background: none; }
+.kits .icon[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.icon .spd { font: 700 12px/1 system-ui, sans-serif; letter-spacing: -0.02em; }
+.icon { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 19px; border: 1px solid var(--line); background: color-mix(in srgb, var(--bg) 85%, transparent); color: var(--ink); cursor: pointer; padding: 0; }
+.icon svg { width: 18px; height: 18px; }
+.icon[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.icon .spd { font: 700 12px/1 system-ui, sans-serif; letter-spacing: -0.02em; }
+.icon:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.icon.join { position: absolute; transform: translate(-50%, -100%); z-index: 3; background: var(--accent); color: #fff; border-color: var(--accent); box-shadow: 0 2px 10px rgba(0,0,0,.25); }
+.icon.join[data-icon="split"] { background: color-mix(in srgb, var(--bg) 85%, transparent); color: var(--ink); border-color: var(--line); width: 30px; height: 30px; }
+.icon.join[hidden] { display: none; }
+.icon.out { position: absolute; transform: translate(-50%, -50%); z-index: 4; background: var(--bad); color: #fff; border-color: var(--bad); box-shadow: 0 2px 10px rgba(0,0,0,.3); animation: pop-in .25s; }
+@keyframes pop-in { from { transform: translate(-50%, -50%) scale(.4); } }
+.icon.join.nudge { animation: blink .5s 2; }
+@keyframes blink { 50% { opacity: .25; } }
+.mark { position: absolute; width: 34px; height: 34px; margin: -17px 0 0 -17px; border-radius: 17px; display: grid; place-items: center; pointer-events: none; animation: pop .9s forwards; }
+.mark svg { width: 18px; height: 18px; }
+.mark.bad { background: var(--bad); color: #fff; } .mark.wait { background: var(--wait); color: #fff; }
+@keyframes pop { 0% { transform: scale(.4); opacity: 0; } 15% { transform: scale(1.1); opacity: 1; } 70% { opacity: 1; } 100% { transform: scale(1); opacity: 0; } }
+.done { position: absolute; inset: auto 0 18px; display: flex; justify-content: center; }
+.done .box { display: flex; gap: 14px; align-items: center; padding: 8px 8px 8px 16px; border-radius: 28px; background: color-mix(in srgb, var(--bg) 90%, transparent); border: 1px solid var(--line); }
+.load { position: absolute; inset: 0; display: grid; place-items: center; }
+.load i { width: 28px; height: 28px; border-radius: 50%; border: 3px solid var(--line); border-top-color: var(--accent); animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(1turn); } }
+.load[hidden], .done[hidden] { display: none; }
+.app.map { grid-template-columns: minmax(0, 1fr); }                                         /* 마을: 원판 없이 넓게, 조립 도구는 숨김 */
+.app.map .sheet, .app.map .hud .chip, .app.map #b-book, .app.map #b-hint, .app.map #b-skip, .app.map #b-ghost, .app.map #b-reset { display: none; }
+.app.map .stage { cursor: default; } .app.map .stage.over { cursor: pointer; }
+.kits .icon.mapk { margin-right: 4px; }
+@media (max-width: 760px) { .app.map { grid-template-rows: minmax(0, 1fr); } }
+/* 설명서: 종이 한 장 (단계 번호, 이번에 끼울 판, 끼우는 그림) */
+.manual { position: absolute; inset: 8px; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; background: var(--paper); color: var(--ink); border-radius: 6px; box-shadow: 0 8px 30px rgba(0,0,0,.25); overflow: hidden; }
+.manual[hidden] { display: none; }
+.m-head { display: flex; align-items: center; gap: 12px; padding: 10px 10px 0 16px; }
+.m-no { font: 500 15px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.m-no b { font-size: 34px; color: var(--ink); margin-right: 2px; }
+.m-dots { display: flex; gap: 5px; flex-wrap: wrap; margin-left: 6px; }
+.m-dots button { width: 10px; height: 10px; padding: 0; border-radius: 5px; border: 1px solid var(--muted); background: none; cursor: pointer; }
+.m-dots button.done { background: var(--muted); }
+.m-dots button[aria-current="step"] { background: var(--accent); border-color: var(--accent); width: 22px; }
+.m-head .icon { margin-left: auto; }
+.m-view { position: relative; min-height: 0; overflow: hidden; }
+.m-view canvas { position: absolute; inset: 0; display: block; width: 100% !important; height: 100% !important; }
+.m-foot { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; padding: 8px 10px 12px; border-top: 1px dashed var(--line); }
+.m-parts { display: flex; flex-wrap: wrap; gap: 14px; justify-content: center; align-items: center; min-width: 0; }
+.m-part { position: relative; line-height: 0; }
+.m-part .fill { fill: var(--birch); stroke: var(--burn); stroke-width: 1.2; }
+.m-part .n { position: absolute; right: -12px; bottom: -4px; font: 500 13px var(--mono); line-height: 1; color: var(--ink); }
+.icon:disabled { opacity: .3; cursor: default; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+@media (max-width: 760px) {
+  .app { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; }
+  .stage { grid-row: 1; }
+  .hud { flex-wrap: wrap; row-gap: 6px; }
+  .hud .chip { order: 3; }                                                                  /* 좁으면: 위 줄 = 키트 + 도구, 아래 줄 = 기록 */
+  .hud .chip:first-of-type { margin-left: 6px; }
+  .hud { column-gap: 6px; } .hud .icon { box-sizing: border-box; }
+  .tools { gap: 2px; } .tools .icon { width: 30px; height: 30px; }                         /* 도구 7 개 + 키트가 폰 한 줄에 */
+  .tools .icon svg { width: 16px; height: 16px; }
+  .kits .icon { width: 28px; height: 28px; flex: none; }
+  .kits { order: -1; flex: 1 1 100%; overflow-x: auto; scrollbar-width: none; margin-right: 0; }      /* 키트 7 개: 폰에서는 맨 위 한 줄 (옆으로 밀기) */
+  .sheet { grid-row: 2; max-height: 32vh; flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; overflow-y: hidden; align-items: center; }
+}
+@media (prefers-reduced-motion: reduce) { .part.shake, .sheet.nudge, .mark, .load i { animation: none; } .mark { opacity: 1; } }
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></symbol>
+  <symbol id="i-wait" viewBox="0 0 24 24"><path d="M7 4h10M7 20h10M8 4c0 5 8 5 8 8s-8 3-8 8M16 4c0 5-8 5-8 8s8 3 8 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="i-bulb" viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="currentColor"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 5c3-1.5 5.5-1.5 8 0v14c-2.5-1.5-5-1.5-8 0zM20 5c-3-1.5-5.5-1.5-8 0v14c2.5-1.5 5-1.5 8 0z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+  <symbol id="i-left" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-right" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+  <symbol id="i-out" viewBox="0 0 24 24"><path d="M12 15V3M7 8l5-5 5 5M5 13v7h14v-7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-join" viewBox="0 0 24 24"><path d="M5 4h6v6M19 20h-6v-6M11 4L4 11M13 20l7-7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 15l6-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+  <symbol id="i-split" viewBox="0 0 24 24"><path d="M4 10V4h6M20 14v6h-6M4 4l6 6M20 20l-6-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-windmill" viewBox="0 0 24 24"><path d="M9.5 21l1.2-9h2.6l1.2 9zM12 10.5L6 4.5M12 10.5l6-6M12 10.5L6.5 16M12 10.5l5.5 5.5" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-cart" viewBox="0 0 24 24"><path d="M4 9l6-4.5L16 9M5 9v6h10V9M15 13h6" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/><circle cx="10" cy="17.5" r="3" fill="none" stroke="currentColor" stroke-width="1.9"/></symbol>
+  <symbol id="i-cottage_kit" viewBox="0 0 24 24"><path d="M3.5 11.5L12 4.5l8.5 7M6 10v9.5h12V10M10 19.5v-5h4v5M16 7.5V4.5h2v4.6" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-well" viewBox="0 0 24 24"><path d="M4 9.5L12 4l8 5.5M7 8v6M17 8v6M7 11h10M5 14h14v6H5z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-mill" viewBox="0 0 24 24"><circle cx="8.5" cy="13" r="5.5" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M8.5 7.5v11M3 13h11M12.5 9.5L18 6l4 3.5M14 13h7v6.5h-7" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-carousel" viewBox="0 0 24 24"><path d="M12 3l8 6H4zM5.5 9v7M18.5 9v7M12 9v7M4 16h16v4H4z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-ferris" viewBox="0 0 24 24"><circle cx="12" cy="10" r="7" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M12 10L7 21M12 10l5 11M5 21h14M12 3v14M5 10h14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="i-lighthouse" viewBox="0 0 24 24"><path d="M9 21l1.5-12h3L15 21zM9.5 9h5M10 6h4v3h-4zM12 3v3M4 7l4 1M20 7l-4 1" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-gate" viewBox="0 0 24 24"><path d="M3 21V7h2v2h2V7h2v14M15 21V7h2v2h2V7h2v14M9 21v-6a3 3 0 0 1 6 0v6M3 21h18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-market_tower" viewBox="0 0 24 24"><path d="M8 22V11h8v11M6 22h12M9.5 11V7.5h5V11M8.5 7.5L12 3l3.5 4.5M10 22v-3a2 2 0 0 1 4 0v3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="14" r="1.8" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
+  <symbol id="i-clocktower" viewBox="0 0 24 24"><path d="M7 21V9l5-5 5 5v12zM12 11v3l2 1" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.5" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol>
+  <symbol id="i-crane" viewBox="0 0 24 24"><path d="M3 21h8M5 21v-6h6v6M5 15V9h6v6M11 10l10-5M20 5.5V13M18 13h4v4h-4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-ship" viewBox="0 0 24 24"><path d="M3 15h18l-2.5 4h-13zM9 15V4l-4 9h4M13 15V5l5 8h-5M5 21c2-1.5 4 0 6-1.5s4 0 6-1.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-viking" viewBox="0 0 24 24"><path d="M12 3L6 20M12 3l6 17M4 20h16M12 3l-7 11M5 14c2 3 5 4 7 4s5-1 7-4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-beam" viewBox="0 0 24 24"><path d="M3 7l14-3M10 5.5V14M6 7v8h3M3 21h18M5 15h6v6M10 14l7-1" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="17" cy="15" r="4" fill="none" stroke="currentColor" stroke-width="1.7"/></symbol>
+  <symbol id="i-treehouse" viewBox="0 0 24 24"><path d="M12 21V9M8 21h8M12 13l-4-2M12 11l4-2M6 9a6 5 0 0 1 12 0c0 2-2 3-6 3s-6-1-6-3zM14 15h5v-3h-5z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-observatory" viewBox="0 0 24 24"><path d="M5 21V12h14v9M3 21h18M5 12a7 7 0 0 1 14 0M12 12l5-6M10 21v-4h4v4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-train" viewBox="0 0 24 24"><path d="M3 15V9h9V6h4v3h3v6zM5 6v3M14 9v6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="7" cy="17.5" r="2.5" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="16" cy="17.5" r="2.5" fill="none" stroke="currentColor" stroke-width="1.7"/></symbol>
+  <symbol id="i-map" viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5zM3 8v8l9 5 9-5V8M12 13v8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-inn" viewBox="0 0 24 24"><path d="M3 11l6-6h6l6 6M5 10v10h14V10M9 20v-5h3v5M14 13h3v3h-3M17 5v3M19 15h2v4h-2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-bakery" viewBox="0 0 24 24"><path d="M10 10l5-5 6 6M12 9v11h8V10M15 20v-4h2v4M3 20v-5a4 4 0 0 1 8 0v5zM5.5 20v-3h3v3M2 20h20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-chapel" viewBox="0 0 24 24"><path d="M4 13l8-6 8 6M6 12v9h12v-9M10 21v-4a2 2 0 0 1 4 0v4M12 7V2.5M10.5 4h3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-townhouse" viewBox="0 0 24 24"><path d="M6 21V9h2V6h2V3h4v3h2v3h2v12zM10 21v-4h4v4M9.5 11h1.5v2H9.5M13 11h1.5v2H13" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-smithy" viewBox="0 0 24 24"><path d="M3 10l9-6 9 6M5 9v11M19 9v11M3 20h18M8 15h8l-1.5 2h-5zM11 17v3M13 17v3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-market_well" viewBox="0 0 24 24"><path d="M5 9l7-5 7 5M7 8v8M17 8v8M7 11h10M5 16h14v5H5zM12 11v3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-stall" viewBox="0 0 24 24"><path d="M3 9l3-5h12l3 5zM3 9a3 2 0 0 0 6 0 3 2 0 0 0 6 0 3 2 0 0 0 6 0M5 10v10M19 10v10M5 15h14M3 20h18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-gatehouse" viewBox="0 0 24 24"><path d="M4 21V6h2v2h2V6h2v2h4V6h2v2h2V6h2v15zM9 21v-5a3 3 0 0 1 6 0v5M2 21h20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-market_hall" viewBox="0 0 24 24"><path d="M3 11l9-6 9 6M4 11h16M5 11v10M19 11v10M4 15h16M7 21v-3a1.5 1.5 0 0 1 3 0v3M14 21v-3a1.5 1.5 0 0 1 3 0v3M12 5V2.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-barn" viewBox="0 0 24 24"><path d="M3 11l9-7 9 7M5 9.5V21h14V9.5M8 21v-7h8v7M8 14l8 7M16 14l-8 7M10.5 9h3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-house_a" viewBox="0 0 24 24"><path d="M6 21V10l6-6 6 6v11zM10 21v-4h4v4M9 11h2v2H9M13 11h2v2h-2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-house_b" viewBox="0 0 24 24"><path d="M3 12l9-7 9 7M5 11v10h14V11M5 15h14M9 11l-4 4M15 11l4 4M10 21v-4h4v4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-tower_mill" viewBox="0 0 24 24"><path d="M9 21V12l3-3 3 3v9zM12 9L5 2M12 9l7-7M12 9L5 16M12 9l7 7M7 21h10" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
+  <symbol id="i-skip" viewBox="0 0 24 24"><path d="M4.5 6v12l8-6zM12.5 6v12l8-6z" fill="currentColor" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M21 6v12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6.5" y="6.5" width="11" height="11" rx="1.5" fill="currentColor"/></symbol>
+  <symbol id="i-sound" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="i-mute" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M16 9.5l5 5M21 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="i-spin" viewBox="0 0 24 24"><ellipse cx="12" cy="13" rx="8.5" ry="3.6" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 4v9M17.5 9.2l2.6 1.6-2.4 1.9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-redo" viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.3-5.7M4 4v5h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+</svg>
+
+<div class="app">
+  <div class="sheet" id="sheet" role="toolbar" aria-label="부품 원판"></div>
+  <div class="stage" id="stage">
+    <div class="bar" aria-hidden="true"><i id="bar"></i></div>
+    <div class="hud">
+      <div class="kits" id="kits" role="group" aria-label="키트"></div>
+      <span class="chip" title="시간"><svg><use href="#i-clock"/></svg><span id="s-time">0:00</span></span>
+      <span class="chip" title="헛손질"><svg><use href="#i-x"/></svg><span id="s-miss">0</span></span>
+      <span class="chip" title="힌트"><svg><use href="#i-bulb"/></svg><span id="s-hint">0</span></span>
+      <div class="tools">
+        <button type="button" class="icon" id="b-book" title="조립 설명서" aria-label="조립 설명서"><svg><use href="#i-book"/></svg></button>
+        <button type="button" class="icon" id="b-hint" title="힌트" aria-label="힌트"><svg><use href="#i-bulb"/></svg></button>
+        <button type="button" class="icon" id="b-play" title="자동 조립" aria-label="자동 조립" aria-pressed="false"><svg><use href="#i-play"/></svg></button>
+        <button type="button" class="icon" id="b-speed" title="자동 조립 빠르기 1배" aria-label="자동 조립 빠르기 1배"><span class="spd">1×</span></button>
+        <button type="button" class="icon" id="b-rot" title="완성 후 돌기" aria-label="완성 후 돌기" aria-pressed="true"><svg><use href="#i-spin"/></svg></button>
+        <button type="button" class="icon" id="b-skip" title="완성 보기" aria-label="완성 보기"><svg><use href="#i-skip"/></svg></button>
+        <button type="button" class="icon" id="b-ghost" title="실루엣 진하게" aria-label="실루엣 진하게" aria-pressed="false"><svg><use href="#i-eye"/></svg></button>
+        <button type="button" class="icon" id="b-sound" title="소리" aria-label="소리" aria-pressed="true"><svg><use href="#i-sound"/></svg></button>
+        <button type="button" class="icon" id="b-reset" title="처음부터" aria-label="처음부터"><svg><use href="#i-redo"/></svg></button>
+      </div>
+    </div>
+    <div class="load" id="load"><i></i></div>
+    <div class="done" id="done" hidden><div class="box"><span class="chip" id="done-stats"></span><button type="button" class="icon" id="b-again" title="다시" aria-label="다시 조립"><svg><use href="#i-redo"/></svg></button><button type="button" class="icon" id="b-tomap" title="마을로" aria-label="마을로 돌아가기" hidden><svg><use href="#i-map"/></svg></button></div></div>
+    <div class="sr" id="live" aria-live="polite"></div>
+    <section class="manual" id="manual" hidden aria-label="조립 설명서">
+      <div class="m-head"><span class="m-no"><b id="m-no">1</b><span id="m-of">/10</span></span>
+        <div class="m-dots" id="m-dots"></div>
+        <button type="button" class="icon" id="m-close" title="닫기" aria-label="설명서 닫기"><svg><use href="#i-close"/></svg></button></div>
+      <div class="m-view" id="m-view"></div>
+      <div class="m-foot">
+        <button type="button" class="icon" id="m-prev" title="이전" aria-label="이전 단계"><svg><use href="#i-left"/></svg></button>
+        <div class="m-parts" id="m-parts"></div>
+        <button type="button" class="icon" id="m-next" title="다음" aria-label="다음 단계"><svg><use href="#i-right"/></svg></button>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const DATA_V = "28";                                                    // 키트 자료 판 (바꿔 올릴 때 올림: 브라우저에 남은 옛 자료와 섞이지 않게)
+const cssColor = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+let KIT, slots = {}, placed = new Set(), selected = null, stats = { miss: 0, hint: 0 }, timer = null, started = 0;
+
+// ---------- 3D 조립대
+const stage = $("stage");
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+renderer.outputEncoding = THREE.sRGBEncoding; renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+stage.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(32, 1, 1, 20000);
+scene.add(new THREE.HemisphereLight(0xfff6e8, 0x6b6250, 0.8));
+const sun = new THREE.DirectionalLight(0xffffff, 0.95); sun.position.set(-300, 600, 450); sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -760, right: 760, top: 760, bottom: -760, near: 10, far: 2600 });   // 수레가 원을 그리는 자리까지 그림자
+scene.add(sun); const fill = new THREE.DirectionalLight(0xffffff, 0.35); fill.position.set(400, 200, -300); scene.add(fill);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.ShadowMaterial({ opacity: 0.16 }));
+ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.dampingFactor = 0.12; controls.minPolarAngle = 0; controls.maxPolarAngle = Math.PI;   // 아래에서도 봄 (360 도)
+const ghostMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.12, depthWrite: false });
+const pulseMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
+const flights = [];
+function recolor() { scene.background = new THREE.Color(cssColor("--stage")); ghostMat.color.set(cssColor("--ghost")); pulseMat.color.set(cssColor("--accent")); }
+recolor();
+const mq = window.matchMedia("(prefers-color-scheme: dark)"); if (mq.addEventListener) mq.addEventListener("change", recolor);
+new MutationObserver(recolor).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+const resize = () => { const w = stage.clientWidth, h = stage.clientHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); };
+new ResizeObserver(resize).observe(stage); resize();
+
+// ---------- 소리 (합성, 파일 없음): 판이 자리에 '톡', 빼기 '딱', 덩어리 합침 '쿵', 그 자리 아님 '둑둑', 아직 '똑똑', 완성 실로폰. 끌 수 있음 (기억)
+const SND = { ctx: null, on: true };
+try { SND.on = localStorage.getItem("sound") !== "off"; } catch (e) {}
+function audio() {
+  if (!SND.ctx) { const A = window.AudioContext || window.webkitAudioContext; if (!A) return null; SND.ctx = new A(); }
+  if (SND.ctx.state === "suspended") SND.ctx.resume();
+  return SND.ctx;
+}
+function knock(t, f, dur, vol, noiseF, drop = 0.6) {            // 나무 두드림 = 짧게 떨어지는 사인 (몸통) + 걸러낸 잡음 (닿는 소리)
+  const a = SND.ctx, o = a.createOscillator(), g = a.createGain();
+  o.type = "sine"; o.frequency.setValueAtTime(f, t); o.frequency.exponentialRampToValueAtTime(f * drop, t + dur);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.004); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g).connect(a.destination); o.start(t); o.stop(t + dur + 0.02);
+  if (!noiseF) return;
+  const n = a.createBufferSource(), len = Math.floor(a.sampleRate * 0.03), b = a.createBuffer(1, len, a.sampleRate), d = b.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3);
+  const bp = a.createBiquadFilter(), ng = a.createGain(); bp.type = "bandpass"; bp.frequency.value = noiseF; bp.Q.value = 1.4; ng.gain.value = vol * 0.9;
+  n.buffer = b; n.connect(bp).connect(ng).connect(a.destination); n.start(t);
+}
+function sfx(kind, delay = 0) {
+  if (!SND.on) return; const a = audio(); if (!a) return;
+  const t = a.currentTime + delay / 1000, j = 1 + (Math.random() - 0.5) * 0.08;               // 높이를 살짝 흔들어 같은 소리가 덜 기계적으로
+  if (kind === "place") knock(t, 420 * j, 0.09, 0.35, 2600 * j);
+  else if (kind === "tick") knock(t, 900 * j, 0.03, 0.08, 4200);
+  else if (kind === "out") knock(t, 620 * j, 0.06, 0.2, 3400 * j);
+  else if (kind === "join") { knock(t, 140, 0.22, 0.5, 900); knock(t + 0.05, 300, 0.08, 0.18, 2000); }
+  else if (kind === "bad") { knock(t, 120, 0.12, 0.35, 500); knock(t + 0.11, 100, 0.14, 0.3, 450); }
+  else if (kind === "wait") { knock(t, 1100, 0.04, 0.14, 5000); knock(t + 0.12, 1100, 0.04, 0.14, 5000); }
+  else if (kind === "done") [523, 659, 784, 1047].forEach((f, i) => knock(t + i * 0.12, f, 0.6, 0.2, 0, 0.98));
+  else if (kind === "creak") knock(t, 85 * j, 0.2, 0.07, 650 * j);
+  else if (kind === "thump") { knock(t, 95 * j, 0.18, 0.4, 700); knock(t + 0.02, 180, 0.06, 0.12, 1500); }   // 방아 공이가 절구에 '쿵'
+  else if (kind === "zip") for (let i = 0; i < 6; i++) knock(t + i * 0.035, 260 + i * 70, 0.05, 0.09 - i * 0.01, 1400 + i * 450);   // 고무줄이 풀리는 '드르륵'
+}
+function setSound(on) {
+  SND.on = on; try { localStorage.setItem("sound", on ? "on" : "off"); } catch (e) {}
+  const b = $("b-sound"); b.setAttribute("aria-pressed", String(on)); b.innerHTML = `<svg><use href="#i-${on ? "sound" : "mute"}"/></svg>`;
+  b.title = on ? "소리 끄기" : "소리 켜기"; b.setAttribute("aria-label", b.title);
+  if (on) sfx("tick");
+}
+$("b-sound").addEventListener("click", () => setSound(!SND.on)); setSound(SND.on);
+
+// ---------- 다 지으면 움직임: 풍차 날개는 축째로 돌고, 수레는 바퀴째로 앞뒤로 굴러감 (각 = 간 거리 / 반지름). 무엇이든 만지면 멈추고 제자리
+let motion = null;
+function startMotion() {
+  const mo = KIT.motion; if (!mo || !mo.spin) return;
+  if (mo.pivot) return startRig(mo);
+  if (mo.spins && mo.circle) {                                                                   // 모터: 바퀴 무리마다 축 (자리·방향은 키트가 줌), 원 중심
+    for (const s of Object.values(slots)) { s.mesh.matrixAutoUpdate = false; s.parentInv = new THREE.Matrix4().copy(s.mesh.parent.matrixWorld).invert(); }
+    const V = a => new THREE.Vector3(...a), C = V(mo.circle.center), g0 = mo.spins[0];
+    motion = { t0: performance.now(), beat: 0, center: C, Rt: g0.dist, rearAngle: 0,
+               groups: mo.spins.map(g => ({ parts: new Set(g.parts), pivot: V(g.pivot), dir: V(g.dir).normalize(), radius: g.radius, dist: g.dist })) };
+    controls.autoRotate = false;                                                                 // 수레가 스스로 도니 카메라는 멈춤, 원 전체가 보이게 물러남
+    const reach = g0.dist + 260, vf = THREE.MathUtils.degToRad(camera.fov / 2), dist = reach / Math.tan(Math.min(vf, Math.atan(Math.tan(vf) * camera.aspect))) * 1.05;
+    controls.target.set(C.x, 40, C.z); camera.position.copy(controls.target).addScaledVector(new THREE.Vector3(-0.55, 0.62, 0.56).normalize(), dist);
+    camera.far = Math.max(camera.far, dist * 6); camera.updateProjectionMatrix(); controls.update();
+    hum(true); return;
+  }
+  const ax = slots[mo.axle]; ax.mesh.geometry.computeBoundingBox();
+  const bb = ax.mesh.geometry.boundingBox.clone().applyMatrix4(ax.base), pivot = bb.getCenter(new THREE.Vector3()), sz = bb.getSize(new THREE.Vector3());
+  const k = sz.x >= sz.y && sz.x >= sz.z ? 0 : sz.y >= sz.z ? 1 : 2, axis = new THREE.Vector3().setComponent(k, 1);   // 축 판의 긴 쪽 = 도는 축
+  for (const s of Object.values(slots)) { s.mesh.matrixAutoUpdate = false; s.parentInv = new THREE.Matrix4().copy(s.mesh.parent.matrixWorld).invert(); }
+  motion = { t0: performance.now(), pivot, axis, spin: new Set(mo.spin), roll: mo.roll, beat: 0, rearAngle: 0 };
+  if (mo.drive === "motor") hum(true);                                                           // 풍차 모터: 날개가 도는 동안 위잉
+}
+// 고무줄 (판이 아님, 실제 키트처럼 함께 들어 있음): 실패와 다리 가로대가 둘 다 놓이면 그 사이에 걸림. 뒤로 감은 만큼 실패 위 고리가 넓어짐
+const BAND = {};
+const toGL = p => new THREE.Vector3(p[0], p[2], -p[1]);                                          // 세계 (z 위) -> glTF (y 위)
+function updateBand() {
+  const b = KIT && KIT.motion && KIT.motion.band, show = b && placed.has(b.spool) && placed.has(b.anchor);
+  if (!show) { if (BAND.line) BAND.line.visible = BAND.coil.visible = false; return; }
+  if (!BAND.line || BAND.line.parent !== kitRoot) {
+    const mat = new THREE.MeshStandardMaterial({ color: 0x7a3b2a, roughness: 0.55, metalness: 0 });
+    BAND.line = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.75, 1, 8), mat); BAND.coil = new THREE.Mesh(new THREE.TorusGeometry(1, 0.09, 8, 40), mat);
+    BAND.line.castShadow = true; kitRoot.add(BAND.line, BAND.coil);
+  }
+  const sp = slots[b.spool], an = slots[b.anchor];
+  const moved = s => { s.mesh.updateWorldMatrix(true, false); return new THREE.Matrix4().copy(s.mesh.matrixWorld).multiply(new THREE.Matrix4().copy(s.base).invert()); };
+  const c = new THREE.Vector3(...b.spool_c).applyMatrix4(moved(sp)), a = new THREE.Vector3(...b.anchor_pt).applyMatrix4(moved(an));   // (내보낼 때 glTF 로 바꿔 둠)
+  const axis = new THREE.Vector3(1, 0, 0), turns = (motion && motion.wound || 0) / (2 * Math.PI);
+  const r = b.spool_r + 0.8 + turns * 0.8, dir = a.clone().sub(c); dir.addScaledVector(axis, -dir.dot(axis)).normalize();
+  const att = c.clone().addScaledVector(dir, r);                                                 // 실패 테두리에서 다리 가로대 쪽으로 나감
+  BAND.line.position.copy(a).add(att).multiplyScalar(0.5); BAND.line.scale.set(1, a.distanceTo(att), 1);
+  BAND.line.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), att.clone().sub(a).normalize());
+  BAND.coil.position.copy(c); BAND.coil.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), axis);
+  BAND.coil.scale.set(r, r, 8 + turns * 30); BAND.coil.visible = turns > 0.01; BAND.line.visible = true;   // 감긴 줄은 축 방향으로 나란히 쌓임
+}
+// 사서 넣는 부품 (판 아님: 기어 모터·모터 바퀴·건전지 상자·스위치·고무 벨트·전선): 붙는 판 (host) 이 놓이면 나타나고 그 판을 따라 움직임
+const BUY = {};
+const movedOf = s => { s.mesh.updateWorldMatrix(true, false); return new THREE.Matrix4().copy(s.mesh.matrixWorld).multiply(new THREE.Matrix4().copy(s.base).invert()); };
+function rod(key, mat, r) { if (!BUY[key] || BUY[key].parent !== kitRoot) { BUY[key] = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 1, 8), mat); BUY[key].castShadow = true; kitRoot.add(BUY[key]); } return BUY[key]; }
+function stretch(m, a, b) { m.position.copy(a).add(b).multiplyScalar(0.5); m.scale.set(1, Math.max(0.01, a.distanceTo(b)), 1); m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.clone().sub(a).normalize()); m.visible = true; }
+function updateBought() {
+  const mo = KIT && KIT.motion; if (!mo || !mo.bought) return;
+  for (const b of mo.bought) {
+    let m = BUY[b.id];
+    if (!m || m.parent !== kitRoot) {
+      const mat = new THREE.MeshStandardMaterial({ color: b.color, roughness: 0.5, metalness: 0, ...(b.glow ? { emissive: b.color, emissiveIntensity: 1.2 } : {}) });
+      m = BUY[b.id] = b.kind === "box" ? new THREE.Mesh(new THREE.BoxGeometry(...b.size), mat) : new THREE.Mesh(new THREE.CylinderGeometry(b.r, b.r, b.thick, 24), mat);
+      m.castShadow = m.receiveShadow = true; m.matrixAutoUpdate = false; kitRoot.add(m);
+    }
+    const host = slots[b.host]; m.visible = !!host && placed.has(b.host); if (!m.visible) continue;
+    const L = new THREE.Matrix4().makeTranslation(...b.center);
+    if (b.kind === "disc") {                                                                     // 원통 축 (y) -> 부품 축, 모터 바퀴는 뒷축 각 x 지름비로 돎
+      L.multiply(new THREE.Matrix4().makeRotationFromQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(...b.axis).normalize())));
+      if (b.spin && motion && motion.rearAngle) L.multiply(new THREE.Matrix4().makeRotationY(motion.rearAngle * b.spin));
+    }
+    m.matrix.copy(movedOf(host)).multiply(L);
+  }
+  const belt = mo.belt, beltOn = belt && belt.hosts.every(h => placed.has(h)), wire = mo.wire, wireOn = wire && wire.hosts.every(h => placed.has(h));
+  const rubber = BUY.rubber ||= new THREE.MeshStandardMaterial({ color: 0x2b2b2b, roughness: 0.7, metalness: 0 });
+  if (beltOn) {                                                                                  // 두 바퀴에 건 고무 벨트: 위·아래 두 줄
+    const A = new THREE.Vector3(...belt.a).applyMatrix4(movedOf(slots[belt.hosts[0]])), B = new THREE.Vector3(...belt.b).applyMatrix4(movedOf(slots[belt.hosts[1]]));
+    const ax = new THREE.Vector3(...(belt.axis || [1, 0, 0])).normalize(), d = B.clone().sub(A).normalize(), n = ax.clone().cross(d).normalize();   // 두 바퀴 축 방향 (수레 x, 풍차 앞뒤)
+    stretch(rod("beltU", rubber, 0.9), A.clone().addScaledVector(n, belt.ra), B.clone().addScaledVector(n, belt.rb));
+    stretch(rod("beltD", rubber, 0.9), A.clone().addScaledVector(n, -belt.ra), B.clone().addScaledVector(n, -belt.rb));
+  } else for (const k of ["beltU", "beltD"]) if (BUY[k]) BUY[k].visible = false;
+  const red = BUY.red ||= new THREE.MeshStandardMaterial({ color: 0xc8402e, roughness: 0.6, metalness: 0 });
+  for (let i = 0; i < 3; i++) {                                                                  // 건전지 -> 바닥판 구멍 -> 모터 (빨간 전선)
+    if (!wireOn) { if (BUY["wire" + i]) BUY["wire" + i].visible = false; continue; }
+    const hostOf = j => slots[j < 3 ? wire.hosts[0] : wire.hosts[1]];
+    stretch(rod("wire" + i, red, 0.6), new THREE.Vector3(...wire.pts[i]).applyMatrix4(movedOf(hostOf(i))), new THREE.Vector3(...wire.pts[i + 1]).applyMatrix4(movedOf(hostOf(i + 1))));
+  }
+}
+// 축 하나로 도는 키트 (오두막 문·우물 도르래·방앗간 물바퀴·회전목마·관람차): 도는 무리 + 맞물린 톱니 (각 x ratio) + 매달린 곤돌라 (수평 유지)
+// + 캠이 드는 공이 (판 모양에서 미리 잰 표) + 줄 끝 두레박. 각은 몰이마다: 경첩은 열렸다 닫힘, 우물은 풀었다 감음, 물·모터·손잡이는 한쪽으로 계속
+function startRig(mo) {
+  for (const s of Object.values(slots)) { s.mesh.matrixAutoUpdate = false; s.parentInv = new THREE.Matrix4().copy(s.mesh.parent.matrixWorld).invert(); }
+  const V = a => new THREE.Vector3(...a);
+  motion = { rig: true, t0: performance.now(), pivot: V(mo.pivot), axis: V(mo.axis).normalize(), spin: new Set(mo.spin), drive: mo.drive, swing: mo.swing || 0, beat: 0, rearAngle: 0,
+             gears: (mo.gears || []).map(g => ({ parts: new Set(g.parts), pivot: V(g.pivot), axis: V(g.axis).normalize(), ratio: g.ratio })),
+             hang: (mo.hang || []).map(h => ({ parts: new Set(h.parts), pivot: V(h.pivot) })),
+             lifts: (mo.lifts || []).map(l => ({ parts: new Set(l.parts), table: l.table, last: 0 })), bucketF: 0 };
+  if (mo.drive === "motor") { hum(true); music(true); }
+}
+const turnAbout = (p, ax, a) => new THREE.Matrix4().makeTranslation(p.x, p.y, p.z).multiply(new THREE.Matrix4().makeRotationAxis(ax, a)).multiply(new THREE.Matrix4().makeTranslation(-p.x, -p.y, -p.z));
+function stepRig(t) {
+  const mo = motion, b = KIT.motion.bucket; let ang;
+  if (mo.drive === "hinge") {                                                                    // 문: 5 초에 한 번 안으로 열렸다 닫힘
+    ang = THREE.MathUtils.degToRad(mo.swing) * (1 - Math.cos(2 * Math.PI * t / 5)) / 2;
+    const beat = Math.floor((t + 1.25) / 2.5); if (beat !== mo.beat) { mo.beat = beat; sfx("creak"); }
+  } else if (KIT.motion.osc) {                                                                   // 감개·쳇바퀴: 감았다 풀었다 (다리가 올라갔다 내려옴, 상자가 올라갔다 내려옴)
+    const o = KIT.motion.osc; mo.bucketF = (1 - Math.cos(2 * Math.PI * t / o.period)) / 2; ang = o.amp * mo.bucketF;
+    const beat = Math.floor(ang / (Math.PI / 2)); if (beat !== mo.beat) { mo.beat = beat; sfx("tick"); }
+  } else if (b) {                                                                                // 우물: 줄을 풀어 내리고 감아 올림 (9 초), 반 바퀴마다 딸깍
+    const A = (b.top - b.bottom) / b.drum_r; mo.bucketF = (1 - Math.cos(2 * Math.PI * t / 9)) / 2; ang = -A * mo.bucketF;
+    const beat = Math.floor(ang / Math.PI); if (beat !== mo.beat) { mo.beat = beat; sfx("tick"); }
+  } else {                                                                                       // 물바퀴·회전목마·관람차: 한쪽으로 계속
+    ang = (KIT.motion.speed || (mo.drive === "water" ? 1.1 : mo.drive === "motor" ? 0.55 : 0.4)) * t;
+    const beat = Math.floor(ang / (Math.PI / 2)); if (beat !== mo.beat) { mo.beat = beat; if (mo.drive === "clock") sfx("tick"); else if (mo.drive !== "motor") sfx("creak"); }
+  }
+  const rk = KIT.motion.rock;
+  if (rk) ang = rk.amp * Math.sin(2 * Math.PI * t / rk.period);                                   // 흔들 범선: 흔들 판 활 둘레로 구름 (기울기 + 그만큼 옆으로)
+  mo.rearAngle = ang;
+  let S = turnAbout(mo.pivot, mo.axis, ang);
+  if (rk) { const r = new THREE.Vector3(...rk.roll).multiplyScalar(-rk.radius * ang); S = new THREE.Matrix4().makeTranslation(r.x, r.y, r.z).multiply(S); }
+  const G = mo.gears.map(g => turnAbout(g.pivot, g.axis, ang * g.ratio));
+  const H = mo.hang.map(h => { const q = h.pivot.clone().applyMatrix4(S).sub(h.pivot); return new THREE.Matrix4().makeTranslation(q.x, q.y, q.z); });
+  const LK = (KIT.motion.links || []).map(L => {                                                  // 이음 표 (빔 엔진): 크랭크 각 칸마다 [돌림 각, 옮김]
+    const n = L.table.length, k = ((Math.floor(ang * (L.ratio || 1) / (2 * Math.PI) * n) % n) + n) % n, [a, dx, dy, dz] = L.table[k];
+    return { parts: L.set ||= new Set(L.parts), M: new THREE.Matrix4().makeTranslation(dx, dy, dz).multiply(turnAbout(new THREE.Vector3(...L.pivot), new THREE.Vector3(...L.axis).normalize(), a)) };
+  });
+  const L = mo.lifts.map(l => { const n = l.table.length, k = ((Math.floor(ang / (2 * Math.PI) * n) % n) + n) % n, v = l.table[k];
+    if (l.last > 2 && v === 0) sfx("thump"); l.last = v; return new THREE.Matrix4().makeTranslation(0, v, 0); });   // 공이가 떨어지면 '쿵'
+  const hz = KIT.motion.hoist, HZ = hz && new THREE.Matrix4().makeTranslation(0, ang * hz.per_rad, 0), hset = hz && (mo.hset ||= new Set(hz.parts));   // 상자: 북이 감은 만큼 올라감
+  for (const s of Object.values(slots)) {
+    if (!placed.has(s.id)) continue;
+    let W = null;
+    const lk = LK.find(x => x.parts.has(s.id));
+    if (lk) W = lk.M;
+    else if (hset && hset.has(s.id)) W = HZ;
+    else if (mo.spin.has(s.id)) W = S;
+    else {
+      let i = mo.gears.findIndex(g => g.parts.has(s.id));
+      if (i >= 0) W = G[i];
+      else if ((i = mo.hang.findIndex(h => h.parts.has(s.id))) >= 0) W = H[i];
+      else if ((i = mo.lifts.findIndex(l => l.parts.has(s.id))) >= 0) W = L[i];
+    }
+    if (KIT.motion.carry && W && W !== S) W = S.clone().multiply(W);                              // 기차: 바퀴·연결봉은 기차와 함께 원을 돌며 제자리에서 돎
+    s.mesh.matrix.copy(s.parentInv).multiply(W ? W.clone().multiply(s.base) : s.base);
+  }
+}
+// 두레박 (사서 넣는 작은 나무 통 + 줄): 도르래 축이 놓이면 보임, 도르래가 돌면 우물 속으로 내려갔다 올라옴
+// 줄·사슬 (사서 넣는 것): 두 판에 붙은 두 점 사이 (판이 움직이면 따라감). 등대 빛: 가리개 창으로 나가는 두 줄기 (가리개와 함께 돎)
+function updateCords() {
+  const mo = KIT && KIT.motion; if (!mo) return;
+  (mo.cords || []).forEach((c, i) => {
+    const on = placed.has(c.ahost) && placed.has(c.bhost), key = "cord" + i;
+    if (!on) { if (BUY[key]) BUY[key].visible = false; return; }
+    const mat = BUY["cm" + i] ||= new THREE.MeshStandardMaterial({ color: c.color, roughness: 0.6, metalness: c.color === "#6b6f72" ? 0.5 : 0 });
+    const A = new THREE.Vector3(...c.a).applyMatrix4(c.fixed_a ? new THREE.Matrix4() : movedOf(slots[c.ahost])), B = new THREE.Vector3(...c.b).applyMatrix4(movedOf(slots[c.bhost]));
+    stretch(rod(key, mat, c.r || 0.6), A, B);
+  });
+  const bm = mo.beam;
+  if (bm) {
+    const host = slots[mo.axle], on = host && placed.has("SL") && placed.has("SA");
+    if (!BUY.beam || BUY.beam.parent !== kitRoot) {
+      const g = new THREE.ConeGeometry(bm.r * 3, bm.len, 24, 1, true); g.translate(0, -bm.len / 2, 0);
+      const m = new THREE.MeshBasicMaterial({ color: 0xfff2b0, transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide });
+      BUY.beam = new THREE.Group(); for (const s of [1, -1]) { const c = new THREE.Mesh(g, m); c.rotation.z = s * Math.PI / 2; BUY.beam.add(c); }
+      BUY.beam.matrixAutoUpdate = false; kitRoot.add(BUY.beam);
+    }
+    BUY.beam.visible = !!(on && motion);                                                          // 다 지어 돌 때만 빛이 남
+    if (BUY.beam.visible) BUY.beam.matrix.copy(movedOf(host)).multiply(new THREE.Matrix4().makeTranslation(...bm.center));
+  }
+}
+function updateBucket() {
+  const b = KIT && KIT.motion && KIT.motion.bucket, on = b && placed.has(KIT.motion.axle);
+  if (!on) { for (const k of ["bucket", "bhandle", "rope"]) if (BUY[k]) BUY[k].visible = false; return; }
+  if (!BUY.bucket || BUY.bucket.parent !== kitRoot) {
+    const wood = new THREE.MeshStandardMaterial({ color: 0xc9a46c, roughness: 0.8, metalness: 0, side: THREE.DoubleSide });
+    BUY.bucket = new THREE.Mesh(new THREE.CylinderGeometry(b.r, b.r * 0.82, b.h, 20, 1, true), wood);
+    const bottom = new THREE.Mesh(new THREE.CircleGeometry(b.r * 0.82, 20), wood); bottom.rotation.x = Math.PI / 2; bottom.position.y = -b.h / 2; BUY.bucket.add(bottom);
+    BUY.bhandle = new THREE.Mesh(new THREE.TorusGeometry(b.r * 0.9, 0.5, 6, 24, Math.PI), new THREE.MeshStandardMaterial({ color: 0x777777, roughness: 0.5, metalness: 0.3 }));
+    BUY.bucket.castShadow = true; kitRoot.add(BUY.bucket, BUY.bhandle);
+  }
+  const f = motion && motion.rig ? motion.bucketF : 0, top = new THREE.Vector3(...b.top_pt), bot = new THREE.Vector3(...b.bottom_pt);
+  const end = top.clone().lerp(bot, f);                                                          // 줄 끝 = 손잡이 꼭대기
+  BUY.bhandle.position.copy(end).add(new THREE.Vector3(0, -b.r * 0.9, 0)); BUY.bhandle.visible = true;
+  BUY.bucket.position.copy(end).add(new THREE.Vector3(0, -b.r * 0.9 - b.h / 2, 0)); BUY.bucket.visible = true;
+  const ropeMat = BUY.ropeMat ||= new THREE.MeshStandardMaterial({ color: 0xe8dcc0, roughness: 0.9, metalness: 0 });
+  stretch(rod("rope", ropeMat, 0.5), new THREE.Vector3(end.x, b.drum_pt[1], end.z), end);       // 북 앞쪽에서 곧게 내려옴
+}
+// 회전목마 오르골: 도는 동안 작은 노래 (합성, 소리를 끄면 안 남)
+const TUNE = [523, 659, 784, 659, 698, 880, 784, 0, 587, 698, 880, 698, 659, 784, 523, 0];
+function music(on) {
+  clearInterval(SND.box); SND.box = null;
+  if (!on || !SND.on) return;
+  let i = 0; SND.box = setInterval(() => { const a = audio(); if (!a || !SND.on) return; const f = TUNE[i++ % TUNE.length]; if (f) knock(a.currentTime, f, 0.7, 0.07, 0, 0.995); }, 330);
+}
+// 모터 소리: 낮은 '위잉' (톱니파 + 저역 거르개), 움직이는 동안만
+function hum(on) {
+  if (on && SND.on && !SND.hum) {
+    const a = audio(); if (!a) return;
+    const o = a.createOscillator(), o2 = a.createOscillator(), f = a.createBiquadFilter(), g = a.createGain();
+    o.type = "sawtooth"; o.frequency.value = 118; o2.type = "square"; o2.frequency.value = 236.5; f.type = "lowpass"; f.frequency.value = 520; g.gain.value = 0;
+    o.connect(f); o2.connect(f); f.connect(g).connect(a.destination); o.start(); o2.start(); g.gain.linearRampToValueAtTime(0.035, a.currentTime + 0.4);
+    SND.hum = { o, o2, g };
+  } else if (!on && SND.hum) {
+    const { o, o2, g } = SND.hum, a = SND.ctx; g.gain.cancelScheduledValues(a.currentTime); g.gain.setValueAtTime(g.gain.value, a.currentTime); g.gain.linearRampToValueAtTime(0, a.currentTime + 0.25);
+    o.stop(a.currentTime + 0.3); o2.stop(a.currentTime + 0.3); SND.hum = null;
+  }
+}
+function stopMotion() {
+  if (!motion) return; motion = null; hum(false); music(false);
+  for (const s of Object.values(slots)) { s.mesh.matrixAutoUpdate = true; s.mesh.updateMatrix(); }
+}
+function stepMotor(t) {                                                                          // 모터: 뒷바퀴 축 선 위 한 점을 중심으로 원을 그리며 계속 감 (앞바퀴가 비스듬히 꺾여 있어서)
+  const mo = motion, v = 70, phi = v * t / mo.Rt, C = mo.center, up = new THREE.Vector3(0, 1, 0);
+  const Ci = new THREE.Matrix4().makeTranslation(C.x, 0, C.z).multiply(new THREE.Matrix4().makeRotationY(phi)).multiply(new THREE.Matrix4().makeTranslation(-C.x, 0, -C.z));
+  const S = mo.groups.map(g => {                                                                 // 바퀴째 돎: 각 = 그 바퀴가 간 거리 / 반지름 (원 둘레를 따라)
+    const ang = phi * g.dist / g.radius, ax = up.clone().cross(g.dir).normalize(), p = g.pivot;
+    if (g === mo.groups[0]) mo.rearAngle = ang;
+    return new THREE.Matrix4().makeTranslation(p.x, p.y, p.z).multiply(new THREE.Matrix4().makeRotationAxis(ax, ang)).multiply(new THREE.Matrix4().makeTranslation(-p.x, -p.y, -p.z));
+  });
+  for (const s of Object.values(slots)) {
+    if (!placed.has(s.id)) continue;
+    const gi = mo.groups.findIndex(g => g.parts.has(s.id)), W = Ci.clone();
+    if (gi >= 0) W.multiply(S[gi]); W.multiply(s.base);
+    s.mesh.matrix.copy(s.parentInv).multiply(W);
+  }
+  const lap = Math.floor(phi / (Math.PI / 2)); if (lap !== mo.beat) { mo.beat = lap; if (lap > 0) sfx("tick"); }   // 4 분의 1 바퀴마다 작은 딸깍
+}
+function stepMotion(now) {
+  const t = (now - motion.t0) / 1000, R = new THREE.Matrix4(), move = new THREE.Matrix4(), tilt = new THREE.Matrix4();
+  if (motion.groups) return stepMotor(t);
+  if (motion.rig) return stepRig(t);
+  let ang;
+  if (motion.roll) {                                                                           // 수레 (고무줄): 손잡이 들기 -> 뒤로 굴려 감기 -> 놓으면 앞으로 -> 내려놓기 -> 다시 제자리로 밀기
+    const f = new THREE.Vector3(...motion.roll.forward), ax = new THREE.Vector3(0, 1, 0).cross(f).normalize();
+    const C = 8.8, u = t % C, ease = x => x * x * (3 - 2 * x), seg = (a, b) => Math.min(1, Math.max(0, (u - a) / (b - a)));
+    const lift = u < 0.5 ? ease(seg(0, 0.5)) : u < 4.6 ? 1 : u < 5.1 ? 1 - ease(seg(4.6, 5.1)) : u < 5.8 ? 0 : u < 6.3 ? ease(seg(5.8, 6.3)) : u < 7.8 ? 1 : 1 - ease(seg(7.8, 8.3));
+    const d = u < 0.5 ? 0 : u < 2.7 ? -70 * ease(seg(0.5, 2.7)) : u < 3.1 ? -70                  // 뒤로 70 mm 굴려 고무줄을 실패에 감음 (손으로 미는 것처럼 천천히)
+      : u < 4.6 ? -70 + 105 * (1 - Math.pow(1 - seg(3.1, 4.6), 2.5))                              // 놓으면 풀리며 빠르게 나갔다 느려짐 (다 풀린 뒤 35 mm 더 미끄러짐)
+      : u < 6.3 ? 35 : u < 7.8 ? 35 * (1 - ease(seg(6.3, 7.8))) : 0;                               // 제자리로 밀어 둠 (고무줄은 느슨)
+    move.makeTranslation(f.x * d, f.y * d, f.z * d);
+    ang = d / motion.roll.radius; R.makeRotationAxis(ax, ang);                                // 바퀴째 돎: 각 = 거리 / 반지름 (미끄러지지 않게)
+    motion.wound = Math.max(0, -ang);                                                          // 실패에 감긴 각 (뒤로 굴린 만큼)
+    const p = motion.pivot, T = THREE.MathUtils.degToRad(4) * lift;                             // 몸통은 바퀴 축 둘레로 기움 (축은 둥근 구멍에서 돎)
+    tilt.makeTranslation(p.x, p.y, p.z).multiply(new THREE.Matrix4().makeRotationAxis(ax, -T)).multiply(new THREE.Matrix4().makeTranslation(-p.x, -p.y, -p.z));
+    const beat = u < 0.5 ? "lift" : u < 2.7 ? "wind" + Math.floor(motion.wound / 0.35) : u < 3.1 ? "hold" : u < 4.6 ? "go" : u < 5.1 ? "down" : u < 5.8 ? "rest" : u < 7.8 ? "back" : "down2";
+    if (beat !== motion.beat) {                                                                 // 들 때·감을 때 딸깍·놓을 때 휙·내려놓을 때 톡
+      const was = motion.beat; motion.beat = beat;
+      if (beat.startsWith("wind")) sfx("tick"); else if (beat === "go") sfx("zip"); else if (beat === "rest" || (beat === "lift" && was === "down2")) sfx("place"); else if (beat === "lift" || beat === "back") sfx("creak");
+    }
+  } else {                                                                                     // 풍차: 뒤 크랭크를 돌리듯 천천히 돎, 날개가 지날 때마다 삐걱
+    ang = -0.9 * t; R.makeRotationAxis(motion.axis, ang); motion.rearAngle = ang;              // 모터 바퀴는 축 각 x 지름비로 돎
+    const beat = Math.floor(-ang / (Math.PI / 2)); if (beat !== motion.beat) { motion.beat = beat; sfx("creak"); }
+  }
+  const p = motion.pivot, S = new THREE.Matrix4().makeTranslation(p.x, p.y, p.z).multiply(R).multiply(new THREE.Matrix4().makeTranslation(-p.x, -p.y, -p.z));
+  motion.spinM = S;
+  for (const s of Object.values(slots)) {
+    if (!placed.has(s.id)) continue;
+    const W = move.clone(); W.multiply(motion.spin.has(s.id) ? S : tilt); W.multiply(s.base);
+    s.mesh.matrix.copy(s.parentInv).multiply(W);
+  }
+}
+
+// ---------- 키트 (소품마다 data/<id>/): 고르면 조립대를 비우고 새로 깖
+const KITS = [{ id: "windmill", name: "풍차" }, { id: "cart", name: "수레" }, { id: "cottage_kit", name: "오두막" }, { id: "well", name: "우물" },
+              { id: "mill", name: "방앗간" }, { id: "carousel", name: "회전목마" }, { id: "ferris", name: "관람차" },
+              { id: "lighthouse", name: "등대" }, { id: "gate", name: "성문" }, { id: "clocktower", name: "시계탑" }, { id: "crane", name: "크레인" }, { id: "ship", name: "범선" },
+              { id: "viking", name: "바이킹" }, { id: "beam", name: "빔 엔진" }, { id: "treehouse", name: "나무 위 집" }, { id: "observatory", name: "천문대" }, { id: "train", name: "기관차" },
+              { id: "market_tower", name: "장터 시계탑" }, { id: "inn", name: "여관" }, { id: "bakery", name: "빵집" }, { id: "chapel", name: "예배당" },
+              { id: "townhouse", name: "계단 박공 집" }, { id: "smithy", name: "대장간" }, { id: "market_well", name: "장터 우물" }, { id: "stall", name: "가판대" },
+              { id: "gatehouse", name: "마을 문" }, { id: "market_hall", name: "장터 회관" }, { id: "barn", name: "헛간" }, { id: "house_a", name: "벽돌 집" },
+              { id: "house_b", name: "목조 집" }, { id: "tower_mill", name: "언덕 풍차" }];
+
+// ---------- 마을 (키트 줄 맨 앞 칸): 판 바닥 위 제자리에 지은 건물이 서고, 안 지은 자리는 흐린 실루엣. 건물을 누르면 그 키트를 조립대에.
+// 다 지으면 (완성) 마을에 섬. 자동 조립 단추 = 안 지은 건물을 판 하나씩 위에서 내려 끼워 보여 줌 (기록 안 함)
+const rnd = seed => () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };   // 씨앗 난수 (나무·배치)
+const VILLAGE = { x0: -410, x1: 990, z0: -410, z1: 410, square: 250, slots: [                   // 자리 (mm, glTF: x = 화면 오른쪽 앞, z = 왼쪽 앞) + 앞 (glTF +Z) 방향 (0 +Z, 1 +X, 2 -Z, 3 -X)
+  // 장터 광장 (refs/map_market/map.png 배치)
+  { kit: "market_tower", x: -125, z: -125, rot: 0 }, { kit: "chapel", x: 15, z: -178, rot: 0 }, { kit: "smithy", x: 135, z: -150, rot: 0 },
+  { kit: "bakery", x: -190, z: 10, rot: 1 }, { kit: "inn", x: -150, z: 160, rot: 1 }, { kit: "townhouse", x: 160, z: 55, rot: 0 },
+  { kit: "market_well", x: 0, z: 0, rot: 0 }, { kit: "stall", x: -85, z: 15, rot: 0 }, { kit: "stall", x: 10, z: -80, rot: 0 },
+  // 바깥 둘레: 마을 문 (앞 담), 회관 (뒤), 헛간·벽돌 집 (오른쪽), 목조 집 (앞 골목), 언덕 풍차 (왼쪽 둘레, 시계탑에 가리지 않게)
+  { kit: "gatehouse", x: 110, z: 380, rot: 0 }, { kit: "market_hall", x: 40, z: -332, rot: 0 }, { kit: "barn", x: 330, z: -300, rot: 0 },
+  { kit: "house_a", x: 322, z: 58, rot: 0 }, { kit: "house_b", x: -150, z: 330, rot: 0 }, { kit: "tower_mill", x: -340, z: -175, rot: 0 }],
+  roads: [[40, [[250, -150], [1000, -150]]], [40, [[322, 150], [1000, 150]]], [24, [[700, -420], [700, 420]]],   // 주거 구역 큰길 둘 + 가로지르는 길
+          [36, [[110, 420], [110, 240]]], [22, [[-150, 368], [-150, 390], [92, 390]]], [24, [[40, -300], [40, -240]]],
+          [22, [[330, -252], [330, -212], [240, -212]]], [22, [[322, 92], [322, 150], [240, 150]]], [16, [[-340, -140], [-300, -95], [-245, -95]]]],
+  pond: [-320, 140, 46],
+  nature: [["oak", -225, -110, 1.0], ["oak", -222, 84, 0.85], ["pine", 66, -218, 0.9], ["oak", 150, 185, 1.1], ["pine", 215, -60, 0.8],
+           ["bush", -60, 210, 1.0], ["bush", 90, 205, 0.8], ["rock", 60, 215, 1.0], ["bush", 222, 120, 0.9], ["rock", -220, -30, 0.8],
+           // 과수원 (왼쪽 둘레), 풍차 언덕, 뒤 숲, 오른쪽 앞 숲, 연못가
+           ["oak", -360, -40, 0.75, 1], ["oak", -305, -40, 0.7, 1], ["oak", -360, 25, 0.75, 1], ["oak", -305, 25, 0.72, 1], ["oak", -330, -275, 0.8, 1], ["oak", -270, -330, 0.75, 1],
+           ["pine", -380, -390, 1.0], ["pine", -230, -385, 0.85], ["pine", -150, -380, 1.1], ["oak", -90, -330, 0.9], ["pine", 150, -385, 0.9], ["oak", 200, -330, 0.85],
+           ["pine", 385, -385, 0.8], ["pine", 385, -90, 1.0], ["oak", 380, 230, 1.0], ["pine", 320, 300, 1.1], ["oak", 250, 360, 0.95],
+           ["pine", 385, 385, 0.85], ["oak", 200, 300, 0.8], ["oak", -385, 270, 0.9], ["pine", -380, 380, 1.0], ["oak", -260, 385, 0.8],
+           ["bush", -270, 120, 0.8], ["bush", -360, 210, 0.7], ["rock", -280, 175, 0.9], ["rock", -365, 110, 0.7], ["bush", -250, -250, 0.9], ["rock", -270, -300, 1.1],
+           ["bush", 250, -260, 0.8], ["bush", 255, 245, 1.0], ["bush", -255, 250, 0.9], ["bush", 60, 300, 0.8], ["rock", 170, 330, 0.8], ["bush", -30, 330, 0.9],
+           ["bush", 380, 20, 0.8], ["rock", 260, -110, 0.8], ["bush", -60, -290, 0.8], ["bush", 120, -290, 0.7]] };
+// 주거 구역 (생성기 집 gh01-gh24): 큰길 둘을 따라 네 줄, 줄마다 여섯 채. 앞 (glTF +Z) 이 길을 봄. 가운데는 풀밭 띠, 뒤는 뜰
+{ const xs = [470, 560, 650, 750, 840, 930]; let k = 1;
+  for (const [z, rot] of [[-205, 0], [-95, 2], [95, 0], [205, 2]]) for (const x of xs) VILLAGE.slots.push({ kit: `gh${String(k++).padStart(2, "0")}`, x, z, rot, name: "집" });
+  const R = rnd(97);
+  for (const x of [520, 610, 800, 890]) for (const z of [-30, 30]) VILLAGE.nature.push([R() < 0.6 ? "oak" : "pine", x + (R() - 0.5) * 20, z, 0.7 + R() * 0.3]);
+  for (const x of [470, 560, 650, 750, 840, 930, 980]) for (const z of [-300, -370, 300, 370]) if (R() < 0.7) VILLAGE.nature.push([["oak", "pine", "bush", "bush", "rock"][Math.floor(R() * 5)], x + (R() - 0.5) * 40, z + (R() - 0.5) * 30, 0.6 + R() * 0.4]);
+  for (const x of [700]) for (const z of [-30, 30]) VILLAGE.nature.push(["bush", x + 30, z, 0.8]); }
+const VKITS = new Set(VILLAGE.slots.map(v => v.kit));
+const BUILT = new Set(); try { JSON.parse(localStorage.getItem("built") || "[]").forEach(k => BUILT.add(k)); } catch (e) {}
+const saveBuilt = () => { try { localStorage.setItem("built", JSON.stringify([...BUILT])); } catch (e) {} };
+let mapOn = false, mapRoot = null, mapPeek = null;
+const GLB = {};
+function glbScene(id) {                                               // 키트 glb (조립된 모습) 를 한 번만 받아 둠
+  return GLB[id] ||= fetch(`data/${id}/kit.glb64.json?v=${DATA_V}`).then(r => r.json()).then(pack => {
+    const bin = atob(pack.glb), buf = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+    return new Promise((ok, bad) => new THREE.GLTFLoader().parse(buf.buffer, "", g => ok(g.scene), bad));
+  });
+}
+const birchMat = new THREE.MeshStandardMaterial({ color: 0xe2cca8, roughness: 0.85, metalness: 0 });
+const burnMat = new THREE.MeshStandardMaterial({ color: 0x9a6a40, roughness: 0.9, metalness: 0 });
+const mapGhostMat = new THREE.MeshBasicMaterial({ color: 0x7a4e2c, transparent: true, opacity: 0.16, depthWrite: false });   // 안 지은 자리: 밝은 바닥 위에서도 보이게 탄 색
+const hitMat = new THREE.MeshBasicMaterial({ visible: false });
+const lineMat = new THREE.LineBasicMaterial({ color: 0x7a4e2c, transparent: true, opacity: 0.55 });
+function cut(geo, mat) {                                              // 판 + 탄 가장자리 선 (레이저로 자른 판처럼)
+  const m = new THREE.Mesh(geo, mat); m.castShadow = m.receiveShadow = true;
+  m.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo, 30), lineMat));
+  return m;
+}
+function groundTex() {                                                 // 바닥판 윗면 (레이저로 새김): 광장·길 = 돌 줄눈, 나머지 = 풀 획, 우물 둘레 원, 가장자리 띠
+  const { x0, x1, z0, z1 } = VILLAGE, N = 2800, px = N / (x1 - x0), M = Math.round((z1 - z0) * px), P = (x, z) => [(x - x0) * px, (z - z0) * px];
+  const canvas = () => { const c = document.createElement("canvas"); c.width = N; c.height = M; return [c, c.getContext("2d")]; };
+  const [c, g] = canvas(), base = "#c8b08a", line = "rgba(96,58,28,0.7)";
+  g.fillStyle = base; g.fillRect(0, 0, N, M);
+  const R = rnd(7);
+  g.strokeStyle = "rgba(96,58,28,0.6)"; g.lineWidth = 2.8; g.lineCap = "round";
+  for (let i = 0; i < 9000 * (x1 - x0) * (z1 - z0) / 820 / 820; i++) {                                    // 풀 (작은 ∧ 획)
+    const x = R() * N, y = R() * M, h = (2 + R() * 2.5) * px, a = (R() - 0.5) * 0.6;
+    g.beginPath(); g.moveTo(x - h * 0.45, y + h * 0.2); g.lineTo(x + Math.sin(a) * h * 0.3, y - h * 0.8); g.lineTo(x + h * 0.45, y + h * 0.15); g.stroke();
+  }
+  const [m, mg] = canvas();                                           // 돌 깔린 곳 (광장 + 길) 가림판
+  const Q = VILLAGE.square, [qx0, qy0] = P(-Q, -Q);
+  mg.fillStyle = "#fff"; mg.fillRect(qx0, qy0, 2 * Q * px, 2 * Q * px);
+  mg.strokeStyle = "#fff"; mg.lineCap = "round"; mg.lineJoin = "round";
+  for (const [w, pts] of VILLAGE.roads) { mg.lineWidth = w * px; mg.beginPath(); pts.forEach((q, i) => i ? mg.lineTo(...P(...q)) : mg.moveTo(...P(...q))); mg.stroke(); }
+  const [st, sg] = canvas();                                          // 돌 줄눈 (온 판) -> 가림판 안만 남김
+  sg.fillStyle = base; sg.fillRect(0, 0, N, M); sg.strokeStyle = line; sg.lineWidth = 3;
+  const hr = (i, j) => { const x = Math.sin(i * 127.1 + j * 311.7) * 43758.5453; return x - Math.floor(x); };
+  const [wx, wy] = P(0, 0), ring = 52 * px;
+  for (let j = 0, y = 0; y < M; j++, y += 16 * px) {
+    let x = (j % 2) * -9 * px;
+    for (let i = 0; x < N; i++) {
+      const w = (13 + 10 * hr(i, j)) * px;
+      if (Math.hypot(x + w / 2 - wx, y + 8 * px - wy) > ring + 6 * px) { sg.beginPath(); sg.roundRect ? sg.roundRect(x + 2, y + 2, w - 4, 16 * px - 4, 7) : sg.rect(x + 2, y + 2, w - 4, 16 * px - 4); sg.stroke(); }
+      x += w;
+    }
+  }
+  for (let k = 0; k < 2; k++) { sg.beginPath(); sg.arc(wx, wy, ring - k * 10 * px, 0, Math.PI * 2); sg.stroke(); }
+  for (let a = 0; a < 24; a++) { const t = a / 24 * Math.PI * 2; sg.beginPath(); sg.moveTo(wx + Math.cos(t) * (ring - 10 * px), wy + Math.sin(t) * (ring - 10 * px)); sg.lineTo(wx + Math.cos(t) * ring, wy + Math.sin(t) * ring); sg.stroke(); }
+  sg.globalCompositeOperation = "destination-in"; sg.drawImage(m, 0, 0);
+  g.drawImage(st, 0, 0);
+  g.strokeStyle = line; g.lineWidth = 4; g.strokeRect(qx0 - 3, qy0 - 3, 2 * Q * px + 6, 2 * Q * px + 6);     // 광장 테 (연석)
+  g.lineWidth = 5; g.strokeRect(14 * px, 14 * px, N - 28 * px, M - 28 * px);
+  const tx = new THREE.CanvasTexture(c); tx.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  return tx;
+}
+// 자연 (판 쌓기): 잎은 물결 윤곽 가로 판을 겹겹이 (위로 갈수록 작게, 가운데가 조금씩 떠돎), 줄기는 엇갈려 꽂은 세로 판 둘.
+// 키트의 쌓은 원판과 같은 결 (옆면 = 옅은 탄 색)
+const sliceMat = [birchMat, new THREE.MeshStandardMaterial({ color: 0xc8a67c, roughness: 0.9, metalness: 0 })];
+const leafMat = [new THREE.MeshStandardMaterial({ color: 0xe8d7b4, roughness: 0.85, metalness: 0 }), sliceMat[1]];
+function blob(r, R, pts = 44, k = 6, amp = 0.13, star = 0) {           // 물결 (잎 덩어리) / 별 (바늘잎) 윤곽
+  const sh = new THREE.Shape(), p1 = R() * 6.28, p2 = R() * 6.28, p3 = R() * 6.28;
+  for (let i = 0; i < pts; i++) {
+    const t = i / pts * Math.PI * 2;
+    let f = 1 + amp * (0.6 * Math.sin(k * t + p1) + 0.3 * Math.sin((k + 3) * t + p2) + 0.18 * Math.sin((2 * k + 1) * t + p3));
+    if (star) f = (i % 2 ? 0.62 : 1.0) * (1 + 0.08 * Math.sin(3 * t + p1));
+    i ? sh.lineTo(r * f * Math.cos(t), r * f * Math.sin(t)) : sh.moveTo(r * f * Math.cos(t), r * f * Math.sin(t));
+  }
+  return sh;
+}
+function slab(shape, h, y, x = 0, z = 0, mat = sliceMat, rot = 0) {     // 가로 판 한 장 (윤곽 -> 두께 h, 위로)
+  const geo = new THREE.ExtrudeGeometry(shape, { depth: h, bevelEnabled: false, curveSegments: 4 }); geo.rotateX(-Math.PI / 2);
+  const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.y = rot; m.castShadow = m.receiveShadow = true; return m;
+}
+function trunk(h, w, branch) {                                        // 줄기 실루엣: 뿌리 퍼짐 + (가지 둘)
+  const sh = new THREE.Shape(); sh.moveTo(-w * 1.9, 0); sh.quadraticCurveTo(-w * 0.7, w * 0.4, -w * 0.55, w * 2.2);
+  if (branch) { sh.lineTo(-w * 0.5, h * 0.62); sh.lineTo(-w * 2.6, h * 0.86); sh.lineTo(-w * 1.9, h * 0.9); sh.lineTo(-w * 0.2, h * 0.72); sh.lineTo(-w * 0.3, h);
+    sh.lineTo(w * 0.3, h); sh.lineTo(w * 0.25, h * 0.66); sh.lineTo(w * 2.2, h * 0.8); sh.lineTo(w * 2.7, h * 0.74); sh.lineTo(w * 0.5, h * 0.55); }
+  else { sh.lineTo(-w * 0.4, h); sh.lineTo(w * 0.4, h); }
+  sh.lineTo(w * 0.55, w * 2.2); sh.quadraticCurveTo(w * 0.7, w * 0.4, w * 1.9, 0); sh.lineTo(-w * 1.9, 0);
+  const g = new THREE.Group();
+  for (const ry of [0, Math.PI / 2]) { const geo = new THREE.ExtrudeGeometry(sh, { depth: 2, bevelEnabled: false }); geo.translate(0, 0, -1); const m = new THREE.Mesh(geo, sliceMat); m.rotation.y = ry; m.castShadow = true; g.add(m); }
+  return g;
+}
+function crown(g, R, cx, cy, cz, rx, ry, lh, off = 0) {               // 잎 덩어리: 달걀꼴 안에 판을 겹겹이
+  const n = Math.max(3, Math.round(2 * ry / lh)), sx = R() * 6.28;
+  for (let i = 0; i < n; i++) {
+    const t = (i + 0.5) / n * 2 - 1, e = t < 0 ? Math.sqrt(1 - t * t * 0.92) : Math.sqrt(1 - t * t), r = rx * Math.max(0.18, e);
+    const wx = Math.sin(sx + i * 0.9) * rx * 0.1, wz = Math.cos(sx * 1.3 + i * 0.7) * rx * 0.1;
+    g.add(slab(blob(r, R), lh * 0.92, cy - ry + i * lh + off, cx + wx, cz + wz, leafMat, R() * 6.28));
+  }
+}
+function tree(x, z, s, kind = "oak", seed = 1) {
+  const g = new THREE.Group(), R = rnd(Math.floor(seed * 7919) % 2147483646 + 1);
+  if (kind === "pine") {                                              // 바늘잎 나무: 별 판이 층층이 (층마다 돌려 놓고, 세 장마다 넓어짐)
+    g.add(trunk(18 * s, 2.4 * s, false));
+    const n = Math.round(22 * s / 1.0), h = 2.6;
+    for (let i = 0; i < n * 0.9; i++) {
+      const t = i / n, tier = (i % 4) / 3, r = 21 * s * (1 - t) * (0.62 + 0.38 * (1 - tier)) + 1.5;
+      g.add(slab(blob(r, R, 16, 0, 0, 1), h * 0.9, 12 * s + i * h, 0, 0, leafMat, i * 0.39));
+    }
+  } else {                                                            // 넓은잎 나무: 큰 덩어리 + 옆 작은 덩어리 둘 (판 높이를 엇갈려 겹쳐도 깜빡이지 않게)
+    const H = 46 * s, lh = 2.8;
+    g.add(trunk(H * 0.72, 3.0 * s, true));
+    crown(g, R, 0, H * 0.82, 0, 24 * s, 17 * s, lh);
+    const a = R() * 6.28;
+    crown(g, R, Math.cos(a) * 16 * s, H * 0.62, Math.sin(a) * 16 * s, 14 * s, 10 * s, lh, lh / 3);
+    crown(g, R, Math.cos(a + 2.6) * 15 * s, H * 0.66, Math.sin(a + 2.6) * 15 * s, 13 * s, 9 * s, lh, 2 * lh / 3);
+  }
+  g.add(slab(blob(10 * s, R, 36, 5, 0.08), 2, 0, 0, 0));                 // 받침 (흙 판)
+  g.position.set(x, 0, z); g.rotation.y = R() * 6.28; return g;
+}
+function bush(x, z, s, seed = 1) {                                    // 덤불: 물결 판 서너 장
+  const g = new THREE.Group(), R = rnd(Math.floor(seed * 104729) % 2147483646 + 1), n = 4;
+  for (let i = 0; i < n; i++) { const r = 11 * s * Math.sqrt(1 - ((i + 0.5) / n) ** 2 * 0.85); g.add(slab(blob(r, R, 36, 5, 0.18), 2.6, i * 2.8, (R() - 0.5) * 2 * s, (R() - 0.5) * 2 * s, leafMat)); }
+  g.position.set(x, 0, z); return g;
+}
+function rock(x, z, s, seed = 1) {                                    // 돌: 모난 판 두세 장
+  const g = new THREE.Group(), R = rnd(Math.floor(seed * 15485863) % 2147483646 + 1);
+  for (let i = 0; i < 3; i++) {
+    const sh = new THREE.Shape(), m = 7, r0 = 7 * s * (1 - i * 0.28);
+    for (let j = 0; j < m; j++) { const t = j / m * 6.28 + R() * 0.5, r = r0 * (0.7 + 0.3 * R()); j ? sh.lineTo(r * Math.cos(t), r * Math.sin(t)) : sh.moveTo(r * Math.cos(t), r * Math.sin(t)); }
+    g.add(slab(sh, 2.6, i * 2.6, (R() - 0.5) * 2, (R() - 0.5) * 2));
+  }
+  g.position.set(x, 0, z); return g;
+}
+function walls(h) {                                                   // 낮은 담 + 기둥 머리. 바깥 둘레 + 옛 마을 동쪽 담 (안쪽 담). 문·길 자리는 트임
+  const g = new THREE.Group(), { x0, x1, z0, z1 } = VILLAGE, gate = VILLAGE.slots.find(v => v.kit === "gatehouse");
+  const seg = (a0, a1) => {                                           // x 방향 a0..a1 한 토막 (나중에 돌려 놓음)
+    const w = new THREE.Group(), len = a1 - a0, n = Math.max(1, Math.round(len / 58));
+    const m = cut(new THREE.BoxGeometry(len, h, 5), birchMat); m.position.set((a0 + a1) / 2, h / 2, 0); w.add(m);
+    for (let k = 0; k <= n; k++) {
+      const x = a0 + 4.5 + (len - 9) * k / n, p = cut(new THREE.BoxGeometry(9, h + 6, 9), birchMat); p.position.set(x, (h + 6) / 2, 0);
+      const cap = cut(new THREE.ConeGeometry(6.6, 6, 4), birchMat); cap.rotation.y = Math.PI / 4; cap.position.set(x, h + 9, 0); w.add(p, cap);
+    }
+    return w;
+  };
+  const line = (along, a0, a1, at, gaps) => {                          // along = "x" (z = at) / "z" (x = at), gaps = [(가운데, 반폭)]
+    let cuts = [[a0, a1]];
+    for (const [c, hw] of gaps) cuts = cuts.flatMap(([p, q]) => [[p, Math.min(q, c - hw)], [Math.max(p, c + hw), q]]).filter(([p, q]) => q - p > 12);
+    for (const [p, q] of cuts) { const w = seg(p, q); if (along === "x") w.position.set(0, 0, at); else { w.rotation.y = -Math.PI / 2; w.position.set(at, 0, 0); } g.add(w); }
+  };
+  const e = 7;
+  line("x", x0 + e, x1 - e, z0 + e, [[700, 16]]);                     // 뒤 (-z)
+  line("x", x0 + e, x1 - e, z1 - e, [[gate.x, 30], [700, 16]]);       // 앞 (+z): 마을 문, 주거 구역 길
+  line("z", z0 + e, z1 - e, x0 + e, []);                              // 서 (-x)
+  line("z", z0 + e, z1 - e, x1 - e, [[-150, 24], [150, 24]]);         // 동 (+x): 큰길 끝
+  line("z", z0 + e, z1 - e, 403, [[-150, 24], [150, 24]]);            // 옛 마을 동쪽 담 (안쪽 담): 큰길 자리 트임
+  return g;
+}
+function pond([x, z, r]) {                                            // 연못: 물 판 (푸른 아크릴) + 둘레 돌 판
+  const g = new THREE.Group(), R = rnd(31);
+  const water = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 1.2, 48), new THREE.MeshStandardMaterial({ color: 0x5f7f8c, roughness: 0.3, metalness: 0 }));
+  water.position.set(x, 0.6, z); water.receiveShadow = true; g.add(water);
+  for (let i = 0; i < 18; i++) { const t = i / 18 * 6.28 + R() * 0.2; g.add(rock(x + Math.cos(t) * (r + 3), z + Math.sin(t) * (r + 3), 0.55 + R() * 0.35, 40 + i)); }
+  return g;
+}
+function fitMap() {                                                   // 앞 모서리 쪽 위에서 비스듬히 (map.png 처럼)
+  const { x0, x1, z0, z1 } = VILLAGE, r = Math.hypot(x1 - x0, z1 - z0) / 2, dir = new THREE.Vector3(1, 1, 1).normalize();   // 판을 감싼 구가 화면에 들게
+  const vf = THREE.MathUtils.degToRad(camera.fov / 2), hf = Math.atan(Math.tan(vf) * camera.aspect), dist = r / Math.sin(Math.min(vf, hf)) * 0.8;
+  controls.target.set((x0 + x1) / 2, 50, (z0 + z1) / 2); camera.position.copy(controls.target).addScaledVector(dir, dist);
+  camera.near = dist / 50; camera.far = dist * 20; camera.updateProjectionMatrix(); controls.update();
+}
+async function buildMap() {
+  mapRoot = new THREE.Group(); scene.add(mapRoot);
+  const { x0, x1, z0, z1 } = VILLAGE, W = x1 - x0, D = z1 - z0, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, T = 14;
+  const top = new THREE.MeshStandardMaterial({ map: groundTex(), roughness: 0.88, metalness: 0 });
+  const board = new THREE.Mesh(new THREE.BoxGeometry(W, T, D), [burnMat, burnMat, top, burnMat, burnMat, burnMat]);
+  board.position.set(cx, -T / 2 - 0.01, cz); board.receiveShadow = true; mapRoot.add(board);
+  const lip = cut(new THREE.BoxGeometry(W + 10, 4, D + 10), birchMat); lip.position.set(cx, -T - 2, cz); mapRoot.add(lip);
+  mapRoot.add(walls(14), pond(VILLAGE.pond));
+  VILLAGE.nature.forEach(([kind, x, z, k], i) => mapRoot.add(kind === "bush" ? bush(x, z, k, i + 3) : kind === "rock" ? rock(x, z, k, i + 5) : tree(x, z, k, kind, i + 1)));
+  const SC = Object.fromEntries(await Promise.all([...VKITS].map(id => glbScene(id).then(sc => [id, sc], () => [id, null]))));   // 아직 안 올라간 키트는 자리만 비움
+  VILLAGE.slots.forEach((v, i) => {
+    if (!SC[v.kit]) return;
+    const src = SC[v.kit], solid = src.clone(true), ghost = src.clone(true);
+    solid.traverse(o => { if (o.isMesh) { o.material = o.material.clone(); Object.assign(o.material, { side: THREE.DoubleSide, metalness: 0, roughness: 0.82 }); o.castShadow = o.receiveShadow = true; } });
+    ghost.traverse(o => { if (o.isMesh) { o.material = mapGhostMat; o.castShadow = false; o.renderOrder = 2; } });
+    solid.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(solid), c = box.getCenter(new THREE.Vector3());
+    const drop = new THREE.Group(); drop.add(solid, ghost);                               // 건물 한 채 (판 + 실루엣)
+    for (const o of [solid, ghost]) o.position.sub(new THREE.Vector3(c.x, box.min.y, c.z));       // glTF 뿌리의 제 자리는 두고 밀기
+    const sz = box.getSize(new THREE.Vector3()), hit = new THREE.Mesh(new THREE.BoxGeometry(sz.x, sz.y, sz.z), hitMat); hit.position.y = sz.y / 2;   // 누를 자리 (판 사이 틈도)
+    const holder = new THREE.Group(); holder.add(drop, hit); v.hit = hit; holder.position.set(v.x, 0, v.z); holder.rotation.y = v.rot * Math.PI / 2;
+    holder.userData.slot = i; Object.assign(v, { holder, solid, ghost }); mapRoot.add(holder);
+  });
+  showVillage();
+}
+function showVillage() {                                              // 지은 건물만 (판은 모두 제자리), 나머지는 실루엣
+  drops.length = 0;
+  for (const v of VILLAGE.slots) {
+    if (!v.solid) continue;
+    const on = BUILT.has(v.kit); v.solid.visible = on; v.ghost.visible = !on;
+    v.solid.traverse(o => { if (o.userData.home) o.position.copy(o.userData.home); if (o !== v.solid) o.visible = true; });
+  }
+  $("live").textContent = `마을 ${[...VKITS].filter(k => BUILT.has(k)).length}/${VKITS.size}`;
+}
+const SUN0 = { pos: sun.position.clone(), cam: { ...sun.shadow.camera } };
+function mapSun(on) {                                                 // 마을: 해 그림자가 넓은 판 전체를 덮게 (키트 조립대에서는 원래대로)
+  const c = sun.shadow.camera, { x0, x1, z0, z1 } = VILLAGE, cx = on ? (x0 + x1) / 2 : 0, cz = on ? (z0 + z1) / 2 : 0, r = on ? 1050 : SUN0.cam.right;
+  sun.target.position.set(cx, 0, cz); sun.target.updateMatrixWorld(); sun.position.copy(SUN0.pos).add(new THREE.Vector3(cx, 0, cz));
+  Object.assign(c, { left: -r, right: r, top: r, bottom: -r, far: on ? 3200 : SUN0.cam.far }); c.updateProjectionMatrix();
+  sun.shadow.mapSize.set(on ? 4096 : 2048, on ? 4096 : 2048); if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; }
+}
+async function enterMap() {
+  mapOn = true; document.querySelector(".app").classList.add("map"); resize(); mapSun(true);
+  if (!mapRoot) await buildMap(); else { mapRoot.visible = true; showVillage(); }
+  fitMap(); controls.autoRotate = false;
+}
+function leaveMap() { stopPeek(); mapSun(false); mapOn = false; document.querySelector(".app").classList.remove("map"); stage.classList.remove("over"); stage.title = ""; if (mapRoot) mapRoot.visible = false; resize(); }
+function stopPeek() { if (!mapPeek) return; clearTimeout(mapPeek.t); mapPeek = null; setPlay(false); controls.autoRotate = false; showVillage(); }
+const KJ = {};
+const kitMeta = id => KJ[id] ||= fetch(`data/${id}/kit.json?v=${DATA_V}`).then(r => r.json());
+async function peekVillage() {                                        // 마을 자동 조립: 안 지은 건물을 뒤에서 앞으로, 건물마다 검증된 순서로 판을 하나씩 끼움 (기록 안 함)
+  showVillage(); setPlay(true); controls.autoRotate = false;
+  const run = mapPeek = { t: null };
+  const todo = VILLAGE.slots.filter(v => v.solid && !BUILT.has(v.kit)).sort((a, b) => (a.x + a.z) - (b.x + b.z));
+  const metas = await Promise.all(todo.map(v => kitMeta(v.kit)));
+  if (mapPeek !== run) return;
+  const seq = [];
+  todo.forEach((v, i) => {
+    const P = Object.fromEntries(metas[i].parts.map(q => [q.id, q]));
+    const ns = metas[i].order.map(id => [v.solid.getObjectByName(id), P[id]]).filter(([n]) => n);
+    for (const [n] of ns) { n.userData.home ||= n.position.clone(); n.visible = false; }
+    v.solid.visible = true;                                           // 실루엣은 다 끼울 때까지 둠
+    seq.push(...ns.map(([n, q]) => ({ n, q })), { end: v });
+  });
+  let k = 0;
+  const step = () => {
+    if (mapPeek !== run) return;
+    const it = seq[k++];
+    if (!it) { run.t = null; sfx("done"); controls.autoRotate = ROT; controls.autoRotateSpeed = 1.2; return; }
+    if (it.end) { it.end.ghost.visible = false; sfx("join"); run.t = setTimeout(step, 420 / SPEED); return; }
+    const n = it.n, h = n.userData.home, ins = it.q.insert || [0, 0, -1];
+    const inv = new THREE.Matrix4().copy(n.parent.matrixWorld).invert();
+    const d = new THREE.Vector3(ins[0], ins[2], -ins[1]).transformDirection(inv).multiplyScalar(-14);     // 끼우는 길 (z 위 -> glTF y 위) 바로 앞
+    const up = new THREE.Vector3(0, 1, 0).transformDirection(inv).multiplyScalar(150);                   // 위에서 내려와서 끼움
+    const pre = h.clone().add(d.y > 0 ? new THREE.Vector3() : d), top = pre.clone().add(up);
+    n.position.copy(top); n.visible = true;
+    drops.push({ o: n, pts: [top, pre, h], t0: performance.now(), dur: 420 / SPEED }); sfx("place", 400 / SPEED);
+    run.t = setTimeout(step, 120 / SPEED);
+  };
+  step();
+}
+const drops = [];
+function stepDrops(now) {                                             // 판이 제자리로 (끝에서 느려짐)
+  for (let i = drops.length - 1; i >= 0; i--) {
+    const d = drops[i], k = Math.min(1, (now - d.t0) / d.dur), [a, b, c] = d.pts;
+    if (k < 0.7) d.o.position.lerpVectors(a, b, 1 - (1 - k / 0.7) ** 2);                            // 내려옴 (끝에서 느려짐)
+    else d.o.position.lerpVectors(b, c, (k - 0.7) / 0.3);                                             // 마지막에 끼우는 길로 쏙
+    if (k >= 1) { d.o.position.copy(c); drops.splice(i, 1); }
+  }
+}
+function mapHit(e) {
+  const r = renderer.domElement.getBoundingClientRect();
+  ptr.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1); ray.setFromCamera(ptr, camera);
+  const hit = ray.intersectObjects(VILLAGE.slots.filter(v => v.hit).map(v => v.hit), false)[0];
+  return hit ? VILLAGE.slots[hit.object.parent.userData.slot] : null;
+}
+let kitId = null, kitRoot = null;
+function unloadKit() {
+  if (!KIT) return;
+  stopDemo(); stopMotion();
+  clearOuts(); clearInterval(timer); timer = null; started = 0; flights.length = 0; placed.clear(); selected = null;
+  if (pulse) { scene.remove(pulse.m); pulse = null; }
+  scene.remove(kitRoot); kitRoot = null;
+  for (const m of Object.keys(MOD)) { MOD[m].btn?.remove(); delete MOD[m]; }
+  if (M.built) { M.renderer.dispose(); $("m-view").innerHTML = ""; M.built = false; }
+  $("manual").hidden = true; $("done").hidden = true; controls.autoRotate = false;
+  slots = {}; KIT = null; $("sheet").innerHTML = "";
+}
+async function switchKit(id) {
+  if (id === kitId) return;
+  unloadKit(); if (mapOn && id !== "map") leaveMap(); kitId = id; $("load").hidden = false;
+  if (id === "map") {
+    document.querySelectorAll("#kits .icon").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.kit === id)));
+    try { localStorage.setItem("kit", id); } catch (e) {}
+    await enterMap(); $("load").hidden = true; return;
+  }
+  document.querySelectorAll("#kits .icon").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.kit === id)));
+  try { localStorage.setItem("kit", id); } catch (e) {}
+  await loadKit(id); $("load").hidden = true; buildSheet(); reset();
+}
+$("kits").innerHTML = `<button type="button" class="icon mapk" data-kit="map" title="마을" aria-label="마을" aria-pressed="false"><svg><use href="#i-map"/></svg></button>` + KITS.map(k => `<button type="button" class="icon" data-kit="${k.id}" title="${k.name}" aria-label="${k.name}" aria-pressed="false"><svg><use href="#i-${k.id}"/></svg></button>`).join("");
+$("kits").querySelectorAll(".icon").forEach(b => b.addEventListener("click", () => switchKit(b.dataset.kit)));
+
+async function loadKit(id) {
+  const [meta, pack] = await Promise.all([fetch(`data/${id}/kit.json?v=${DATA_V}`).then(r => r.json()), fetch(`data/${id}/kit.glb64.json?v=${DATA_V}`).then(r => r.json())]);
+  const bin = atob(pack.glb), buf = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+  const gltf = await new Promise((ok, bad) => new THREE.GLTFLoader().parse(buf.buffer, "", ok, bad));
+  kitRoot = new THREE.Group(); scene.add(kitRoot);
+  kitRoot.add(gltf.scene); gltf.scene.updateMatrixWorld(true);
+  for (const p of meta.parts) {
+    const node = gltf.scene.getObjectByName(p.id), mesh = node.isMesh ? node : node.getObjectByProperty("isMesh", true);
+    Object.assign(mesh.material, { side: THREE.DoubleSide, metalness: 0, roughness: 0.82 }); mesh.castShadow = mesh.receiveShadow = true;
+    const ghost = new THREE.Mesh(mesh.geometry, ghostMat); ghost.matrixAutoUpdate = false; ghost.matrix.copy(mesh.matrixWorld);
+    ghost.userData.id = p.id; ghost.renderOrder = 2; kitRoot.add(ghost);
+    const toLocal = new THREE.Matrix4().copy(mesh.parent.matrixWorld).invert();             // 방향 (glTF 세계) -> 판 부모 좌표
+    const local = meta.dirs.map(d => new THREE.Vector3(...d).transformDirection(toLocal));  // 6 방향, 판 부모 좌표로
+    mesh.userData.id = p.id;
+    slots[p.id] = { ...p, mesh, ghost, home: mesh.position.clone(), local, base: mesh.matrixWorld.clone(), toLocal3: new THREE.Matrix3().setFromMatrix4(toLocal) };
+    mesh.visible = false;
+  }
+  KIT = meta;
+  layoutModules();
+  const box = new THREE.Box3(); for (const s of Object.values(slots)) box.union(boxOf(s, offOf(s.module)));   // 탁자 위 덩어리까지 다 보이게
+  const c = box.getCenter(new THREE.Vector3());
+  const vf = THREE.MathUtils.degToRad(camera.fov / 2), hf = Math.atan(Math.tan(vf) * camera.aspect);   // 세로 화면이면 가로 시야로 맞춤
+  const sz = box.getSize(new THREE.Vector3()), halfW = Math.max(sz.x, sz.z) / 2, halfH = sz.y / 2;
+  const dist = Math.max(halfW / Math.tan(hf), halfH / Math.tan(vf)) * 1.08 + halfW, r = dist;
+  controls.target.copy(c); camera.position.copy(c).addScaledVector(new THREE.Vector3(-Math.sin(0.7), 0.4, Math.cos(0.7)).normalize(), dist);
+  camera.near = dist / 50; camera.far = dist * 20; camera.updateProjectionMatrix(); controls.update();
+}
+
+// ---------- 덩어리 (실물 키트의 소조립): 몸통은 가운데, 나머지는 탁자 위 옆에 따로 놓고 지은 뒤 합침
+const MOD = {};                                                      // 이름 -> { joined, off (탁자 자리, glTF 세계), btn }
+const boxOf = (s, off) => { s.mesh.geometry.computeBoundingBox(); const b = s.mesh.geometry.boundingBox.clone().applyMatrix4(s.base); if (off) b.translate(off); return b; };
+const offOf = m => MOD[m].joined ? new THREE.Vector3() : MOD[m].off;
+function layoutModules() {                                            // 바닥 덩어리 (KIT.base) 는 가운데, 나머지는 옆·뒤·앞 탁자 위에 (바닥에 닿게)
+  const boxes = {};
+  for (const s of Object.values(slots)) (boxes[s.module] ||= new THREE.Box3()).union(boxOf(s));
+  const body = boxes[KIT.base], gap = 40, free = ["+x", "-x", "-z", "+z"].filter(d => !Object.values(KIT.layout || {}).includes(d)), place = {};
+  for (const m of KIT.modules) {
+    if (m === KIT.base) { place[m] = new THREE.Vector3(); continue; }
+    const side = (KIT.layout || {})[m] || free.shift(), b = boxes[m], v = new THREE.Vector3(0, -b.min.y, 0);
+    if (side === "+x") v.x = body.max.x - b.min.x + gap; else if (side === "-x") v.x = body.min.x - b.max.x - gap;
+    else if (side === "-z") v.z = body.min.z - b.max.z - gap; else v.z = body.max.z - b.min.z + gap;
+    place[m] = v;
+  }
+  for (const m of KIT.modules) {
+    MOD[m] = { joined: m === KIT.base, off: place[m] };
+    if (m === KIT.base) continue;
+    const b = document.createElement("button"); b.type = "button"; b.className = "icon join"; b.dataset.m = m; b.hidden = true;
+    b.addEventListener("click", () => MOD[m].joined ? split(m) : join(m)); stage.appendChild(b); MOD[m].btn = b;
+  }
+  poseAll();
+}
+function homeOf(id) { const s = slots[id]; return s.home.clone().add(offOf(s.module).clone().applyMatrix3(s.toLocal3)); }
+function poseAll() {                                                  // 실루엣·놓인 판을 덩어리 자리로 (움직임 없이)
+  for (const s of Object.values(slots)) {
+    s.ghost.matrix.copy(new THREE.Matrix4().makeTranslation(...offOf(s.module).toArray()).multiply(s.base));
+    if (placed.has(s.id)) s.mesh.position.copy(homeOf(s.id));
+  }
+}
+const bodyOf = id => { const m = slots[id].module; return new Set([...placed].filter(q => MOD[slots[q].module].joined === MOD[m].joined && (MOD[m].joined || slots[q].module === m))); };
+function joinPlan(m, mine = [...placed].filter(q => slots[q].module === m)) {   // 합칠 길 (판을 움직이지 않고 봄): {e} | {none} 붙을 데 없음 | {blockers}
+  const body = new Set([...placed].filter(q => MOD[slots[q].module].joined));
+  if (!KIT.joints.some(([a, b]) => (mine.includes(a) && body.has(b)) || (mine.includes(b) && body.has(a)))) return { none: true };
+  let fewest = null;
+  for (const e of DI().sort((a, b) => KIT.dirs[b][1] - KIT.dirs[a][1])) {
+    const hit = [...new Set(mine.flatMap(a => slots[a].out[e].filter(q => body.has(q))))];
+    if (!hit.length) return { e };
+    if (!fewest || hit.length < fewest.length) fewest = hit;
+  }
+  return { blockers: fewest };
+}
+function culprits(m) {                                                 // 이 덩어리의 판 중 빼면 합칠 수 있게 되는 가장 적은 판들 (예: 뒤 크랭크·쐐기는 축이 박공을 다 지난 뒤에)
+  const mine = [...placed].filter(q => slots[q].module === m), body = new Set([...placed].filter(q => MOD[slots[q].module].joined));
+  const cands = DI().sort((a, b) => KIT.dirs[b][1] - KIT.dirs[a][1])
+    .map(e => mine.filter(a => slots[a].out[e].some(q => body.has(q)))).filter(S => S.length < mine.length).sort((a, b) => a.length - b.length);
+  return cands.find(S => joinPlan(m, mine.filter(q => !S.includes(q))).e !== undefined) || [];   // 빼고 나면 정말 합쳐지는 가장 적은 무리
+}
+function join(m) {                                                    // 덩어리를 몸통에 합침: 곧은 길 하나 + 몸통과 결합이 하나라도 있어야
+  const mine = [...placed].filter(q => slots[q].module === m), jp = joinPlan(m, mine);
+  if (jp.none) { nudge(MOD[m].btn); return; }                       // 붙을 데가 아직 없음 (예: 지붕 없이 날개)
+  if (jp.blockers) {                                                  // 덩어리 제 판이 길을 막으면 그 판들에 빼기 단추, 아니면 몸통에서 막는 판을 깜빡
+    const xs = culprits(m); if (xs.length) { flash(xs); offerOut(xs); } else flash(jp.blockers);
+    nudge(MOD[m].btn); sfx("wait"); return;
+  }
+  { const e = jp.e;
+    const from = {}; for (const a of mine) from[a] = slots[a].mesh.position.clone();
+    MOD[m].joined = true; poseAll();
+    for (const a of mine) { const s = slots[a], fin = homeOf(a), near = fin.clone().addScaledVector(s.local[e], 80); settle(s.mesh); s.mesh.position.copy(from[a]); tween(s.mesh, from[a], near, 0, 420); tween(s.mesh, near, fin, 440, 360); }
+    sfx("join", 770); refresh(); checkDone();
+  }
+}
+function split(m) {                                                   // 다시 탁자로: 빠질 길이 있고, 이 덩어리에만 붙은 다른 덩어리가 없어야
+  const mine = [...placed].filter(q => slots[q].module === m), rest = new Set([...placed].filter(q => MOD[slots[q].module].joined && slots[q].module !== m));
+  for (const o of KIT.modules) {                                       // 이 덩어리를 빼면 허공에 뜨는 덩어리 (지붕을 빼면 날개)
+    if (o === m || o === KIT.base || !MOD[o].joined) continue;
+    const om = [...placed].filter(q => slots[q].module === o); if (!om.length) continue;
+    const other = KIT.joints.some(([a, b]) => (om.includes(a) && rest.has(b) && slots[b].module !== o) || (om.includes(b) && rest.has(a) && slots[a].module !== o));
+    if (!other) { flash(om); return; }
+  }
+  for (const e of DI().sort((a, b) => KIT.dirs[b][1] - KIT.dirs[a][1])) {
+    if (mine.some(a => slots[a].out[e].some(q => rest.has(q)))) continue;
+    const from = {}; for (const a of mine) from[a] = slots[a].mesh.position.clone();
+    stopMotion(); MOD[m].joined = false; poseAll(); sfx("out");
+    for (const a of mine) { const s = slots[a], fin = homeOf(a), up = from[a].clone().addScaledVector(s.local[e], 80); settle(s.mesh); s.mesh.position.copy(from[a]); tween(s.mesh, from[a], up, 0, 360); tween(s.mesh, up, fin, 380, 420); }
+    refresh(); return;
+  }
+  flash([...new Set(mine.flatMap(a => slots[a].out[0].filter(q => rest.has(q))))]);
+}
+function nudge(el) { if (!el) return; el.classList.remove("nudge"); void el.offsetWidth; el.classList.add("nudge"); }
+const joinIcon = `<svg><use href="#i-join"/></svg>`, splitIcon = `<svg><use href="#i-split"/></svg>`;
+// 막는 판 위에 빼기 단추 (막혔을 때만, 4 초): 한 번 누르면 그 판이 빠짐. 그 판도 막혀 있으면 다음 막는 판에 단추가 옮겨 감
+let outs = [], outT = 0;
+function offerOut(ids) {
+  clearOuts();
+  outs = (ids || []).map(id => { const b = document.createElement("button"); b.type = "button"; b.className = "icon out"; b.title = "빼기"; b.setAttribute("aria-label", "막는 판 빼기");
+    b.innerHTML = '<svg><use href="#i-out"/></svg>'; b.dataset.id = id; b.addEventListener("click", e => { e.stopPropagation(); const r = b.getBoundingClientRect(); takeOut(id, r.left + r.width / 2, r.top + r.height / 2); });
+    stage.appendChild(b); return b; });
+  clearTimeout(outT); outT = setTimeout(clearOuts, 4000);
+}
+function clearOuts() { for (const b of outs) b.remove(); outs = []; }
+function placeButtons() {                                             // 덩어리 위에 합치기·떼기 단추, 막는 판 위 빼기 단추 (매 화면)
+  if (!KIT) return;
+  const rr = stage.getBoundingClientRect();
+  for (const b of outs) {
+    const s = slots[b.dataset.id]; if (!placed.has(s.id)) { b.hidden = true; continue; }
+    s.mesh.geometry.computeBoundingBox(); const p = s.mesh.geometry.boundingBox.getCenter(new THREE.Vector3()).applyMatrix4(s.mesh.matrixWorld).project(camera);
+    b.style.left = ((p.x + 1) / 2 * rr.width) + "px"; b.style.top = ((1 - p.y) / 2 * rr.height) + "px";
+  }
+  const r = stage.getBoundingClientRect();
+  for (const m of KIT.modules) {
+    const b = MOD[m].btn; if (!b) continue;
+    const mine = [...placed].filter(q => slots[q].module === m);
+    b.hidden = mine.length === 0 || !!motion;                         // 굴러가는 동안은 단추 숨김
+    if (b.hidden) continue;
+    const box = new THREE.Box3(); for (const q of mine) box.union(boxOf(slots[q], offOf(m)));
+    const p = new THREE.Vector3((box.min.x + box.max.x) / 2, box.max.y + 14, (box.min.z + box.max.z) / 2).project(camera);
+    b.style.left = ((p.x + 1) / 2 * r.width) + "px"; b.style.top = ((1 - p.y) / 2 * r.height) + "px";
+    const want = MOD[m].joined ? "split" : "join";
+    if (b.dataset.icon !== want) { b.dataset.icon = want; b.innerHTML = want === "join" ? joinIcon : splitIcon; b.title = want === "join" ? "합치기" : "떼어 내기"; b.setAttribute("aria-label", b.title); }
+  }
+}
+const allJoined = () => KIT.modules.every(m => MOD[m].joined);
+function checkDone() { if (placed.size === KIT.parts.length && allJoined()) setTimeout(finish, 900); }
+
+// ---------- 원판 (같은 모양은 한 조각 + 남은 개수)
+function partSVG(p, scale) {
+  const [ext, ...holes] = p.outline, xs = ext.map(q => q[0]), ys = ext.map(q => q[1]);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const s = Math.max(scale, 30 / Math.max(x1 - x0, y1 - y0)), w = (x1 - x0) * s, h = (y1 - y0) * s;
+  const ring = pts => "M" + pts.map(([x, y]) => `${((x - x0) * s).toFixed(1)},${((y1 - y) * s).toFixed(1)}`).join("L") + "Z";
+  return `<svg width="${w.toFixed(0)}" height="${h.toFixed(0)}" viewBox="0 0 ${w.toFixed(1)} ${h.toFixed(1)}" aria-hidden="true"><path class="fill" d="${[ext, ...holes].map(ring).join("")}" fill-rule="evenodd"/></svg>`;
+}
+const left = shape => KIT.groups[shape].filter(id => !placed.has(id)).length;
+function buildSheet() {
+  const scale = 92 / Math.max(...KIT.parts.map(p => Math.max(...p.size)));
+  const shapes = Object.keys(KIT.groups).sort((a, b) => { const A = slots[KIT.groups[a][0]].size, B = slots[KIT.groups[b][0]].size; return B[0] * B[1] - A[0] * A[1]; });
+  $("sheet").innerHTML = shapes.map(sh => {
+    const p = slots[KIT.groups[sh][0]];
+    return `<button type="button" class="part" data-shape="${sh}" aria-pressed="false" aria-label="판 ${Math.round(p.size[0])}×${Math.round(p.size[1])} mm">${partSVG(p, scale)}<span class="n"></span></button>`;
+  }).join("");
+  document.querySelectorAll(".part").forEach(b => b.addEventListener("click", () => { stopDemo(); selected = selected === b.dataset.shape ? null : b.dataset.shape; sfx("tick"); refresh(); }));
+}
+function refresh() {
+  document.querySelectorAll(".part").forEach(b => {
+    const n = left(b.dataset.shape); b.disabled = n === 0; b.querySelector(".n").textContent = KIT.groups[b.dataset.shape].length > 1 ? n : "";
+    b.setAttribute("aria-pressed", String(b.dataset.shape === selected));
+  });
+  $("bar").style.width = (100 * placed.size / KIT.parts.length) + "%";
+  $("s-miss").textContent = stats.miss; $("s-hint").textContent = stats.hint;
+}
+
+// ---------- 규칙 (하나뿐): 판은 6 방향 중 이미 놓인 판에 안 걸리는 곧은 길로 들어오고 나감. 순서·받침 규칙 없음 (실루엣이 지그처럼 잡아 줌)
+// out[k] = 그 판을 제자리에서 방향 k 로 밀어낼 때 부딪히는 판 (미리 계산). 들어오기 = 그 길을 거꾸로.
+const hitOut = (id, k, set = bodyOf(id)) => slots[id].out[k].filter(q => set.has(q) && q !== id);   // 같은 덩어리 (따로 놓인 덩어리끼리는 안 부딪힘)
+function plan(id) {
+  // 1) 곧은 길 하나라도 비었으면 바로 (풀이 때 쓴 방향을 먼저 써 봄: 보기 좋은 동작)
+  const pref = slots[id].insert.map(v => -v), ks = DI().sort((a, b) => dot(KIT.dirs[b], pref) - dot(KIT.dirs[a], pref));
+  let fewest = null;
+  for (const k of ks) { const b = hitOut(id, k); if (!b.length) return { k }; if (!fewest || b.length < fewest.length) fewest = b; }
+  // 2) 길을 막는 판들을 한 방향 e 로 들어 올림 (그 길에 걸리는 놓인 판도 같이 = 실제로 같이 들리는 덩어리) -> 판 넣음 -> 내림.
+  //    탭은 장부 구멍에서 곧게 빠지니 결합된 판이라도 e 쪽으로 안 걸리면 남음. 들리는 덩어리가 새 판에 걸리면 안 됨.
+  const E = DI().sort((a, b) => KIT.dirs[b][1] - KIT.dirs[a][1]), all = bodyOf(id).size;   // 위로 드는 것부터
+  for (const k of ks) {
+    const B = hitOut(id, k);
+    for (const e of E) {
+      const G = new Set(B), st = [...B];
+      while (st.length) { const g = st.pop(); for (const q of hitOut(g, e)) if (!G.has(q)) { G.add(q); st.push(q); } }
+      if (G.size >= all) continue;                                                         // 전부 드는 건 합치기가 아님
+      if ([...G].some(g => slots[g].out[e].includes(id))) continue;                        // 내려올 때 새 판에 걸림
+      return { k, lift: { G: [...G], e } };
+    }
+  }
+  return { blockers: fewest };
+}
+const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const DI = () => KIT.dirs.map((_, i) => i);                         // 곧게 드나드는 방향 번호 (축 6 + 비스듬한 판의 방향)
+function flash(ids) {                                             // 막는 판을 잠깐 붉게 (해 본 뒤에만)
+  for (const id of ids || []) {
+    const s = slots[id], m = new THREE.Mesh(s.mesh.geometry, new THREE.MeshBasicMaterial({ color: cssColor("--bad"), transparent: true, opacity: 0.55, depthWrite: false }));
+    m.matrixAutoUpdate = false; m.matrix.copy(s.mesh.matrixWorld); m.renderOrder = 4; scene.add(m);
+    setTimeout(() => scene.remove(m), 900);
+  }
+}
+function mark(x, y, kind) {                                       // 누른 자리에 표식: 빨강 ✕ = 그 자리 아님, 노랑 모래시계 = 자리는 맞는데 아직
+  const r = stage.getBoundingClientRect(), m = document.createElement("div");
+  m.className = "mark " + kind; m.style.left = (x - r.left) + "px"; m.style.top = (y - r.top) + "px";
+  m.innerHTML = `<svg><use href="#i-${kind === "bad" ? "x" : "wait"}"/></svg>`; stage.appendChild(m); setTimeout(() => m.remove(), 950);
+  $("live").textContent = kind === "bad" ? "그 자리 아님" : "아직"; sfx(kind);
+}
+function miss(x, y, kind) {
+  stats.miss++; refresh(); mark(x, y, kind);
+  const b = document.querySelector(`.part[data-shape="${selected}"]`); if (b) { b.classList.remove("shake"); void b.offsetWidth; b.classList.add("shake"); }
+}
+function tween(mesh, from, to, delay, dur) { const k = demo ? SPEED : 1; flights.push({ mesh, from: from.clone(), to: to.clone(), t0: performance.now() + delay / k, dur: dur / k }); }
+function settle(mesh) { for (let i = flights.length - 1; i >= 0; i--) if (flights[i].mesh === mesh) flights.splice(i, 1); }   // 빠르게 연달아 누르면 앞 움직임을 버림
+function liftAround(p, t0, hold) {                                 // 막는 덩어리: 들었다가 (hold 뒤에) 내림
+  if (!p.lift) return 0;
+  for (const g of p.lift.G) settle(slots[g].mesh);
+  for (const g of p.lift.G) { const q = slots[g], h = homeOf(g), up = h.clone().addScaledVector(q.local[p.lift.e], 70); tween(q.mesh, h, up, t0, 280); tween(q.mesh, up, h, t0 + 300 + hold, 300); }
+  return 300;
+}
+function place(id, p) {
+  const s = slots[id], t = liftAround(p, 0, 520), h = homeOf(id);
+  clearOuts(); settle(s.mesh); placed.add(id); s.ghost.visible = false; s.mesh.visible = true;
+  const from = h.clone().addScaledVector(s.local[p.k], 90);                                  // 빼는 길의 바깥 끝에서 거꾸로 들어옴
+  stopMotion(); s.mesh.position.copy(from); tween(s.mesh, from, h, t, 480); sfx("place", t + 430);   // 판이 자리에 닿을 때 '톡'
+  if (!started && !demoRun) startClock();
+  if (selected && left(selected) === 0) selected = null;
+  refresh(); checkDone();
+}
+function takeOut(id, x, y) {                                       // 놓인 판 빼기: 끼울 때와 같은 길 규칙 (곧은 길, 아니면 막는 덩어리를 들었다 내림)
+  const p = plan(id);
+  if (p.blockers) { mark(x, y, "wait"); flash(p.blockers); offerOut(p.blockers); return; }
+  const s = slots[id], t = liftAround(p, 0, 420), h = homeOf(id);
+  stopMotion(); settle(s.mesh); placed.delete(id);
+  tween(s.mesh, h, h.clone().addScaledVector(s.local[p.k], 90), t, 380); sfx("out", t);
+  setTimeout(() => { if (!placed.has(id)) { s.mesh.visible = false; s.ghost.visible = true; } }, t + 400);
+  refresh();
+}
+
+// ---------- 누르기 (끌기와 구분): 판 고르기 1 + 자리 누르기 1 = 두 번
+const ray = new THREE.Raycaster(), ptr = new THREE.Vector2(); let down = null;
+renderer.domElement.addEventListener("pointerdown", e => { down = { x: e.clientX, y: e.clientY }; });
+let overT = 0; renderer.domElement.addEventListener("pointermove", e => {                  // 마을: 건물 위면 손가락 모양 + 이름
+  if (!mapOn || e.buttons || performance.now() - overT < 60) return; overT = performance.now();
+  const v = mapHit(e); stage.classList.toggle("over", !!v); stage.title = v ? v.name || KITS.find(k => k.id === v.kit)?.name || "" : "";
+});
+renderer.domElement.addEventListener("pointerup", e => {
+  if (mapOn) { if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) <= 6) { const v = mapHit(e); if (v) { stopPeek(); switchKit(v.kit); } } down = null; return; }   // 마을: 건물 누르기 = 그 키트로
+  if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6 || !KIT) return; down = null;
+  if (demo) return stopDemo();                                                                // 자동 조립 중 누르기 = 멈춤 (돌려 보기는 그대로)
+  const r = renderer.domElement.getBoundingClientRect();
+  ptr.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(ptr, camera);
+  const hits = ray.intersectObjects(Object.values(slots).filter(s => !placed.has(s.id)).map(s => s.ghost), false);
+  if (!selected) {                                                                            // 판 안 고름: 놓인 판 누르기 = 빼기, 빈 자리 = 원판 깜빡
+    const got = ray.intersectObjects([...placed].map(id => slots[id].mesh), false);
+    if (got.length) return takeOut(got[0].object.userData.id, e.clientX, e.clientY);         // 실루엣은 비쳐 보이니 놓인 판이 먼저
+    if (hits.length) { const sh = $("sheet"); sh.classList.remove("nudge"); void sh.offsetWidth; sh.classList.add("nudge"); }
+    return;
+  }
+  if (!hits.length) return;                                                                   // 빈 곳 = 아무 일 없음
+  const same = hits.map(h => slots[h.object.userData.id]).filter(s => s.shape === selected);  // 겉판 뒤 안쪽 자리도 눌러 끼울 수 있게
+  if (!same.length) return miss(e.clientX, e.clientY, "bad");
+  let first = null;
+  for (const s of same) { const p = plan(s.id); if (!p.blockers) return place(s.id, p); first ||= p; }
+  miss(e.clientX, e.clientY, "wait"); flash(first.blockers); offerOut(first.blockers);                                  // 막는 판을 보여 줌
+});
+
+// ---------- 힌트 (누를 때만): 고른 판이 지금 들어갈 자리 하나 / 안 골랐으면 지금 끼울 수 있는 판 하나를 골라 줌
+let pulse = null;
+$("b-hint").addEventListener("click", () => {
+  if (!KIT) return;
+  stopDemo(); stats.hint++;
+  const can = id => !placed.has(id) && !plan(id).blockers;
+  if (!selected || !KIT.groups[selected].some(can)) {
+    const id = KIT.order.find(can); if (!id) { const m = KIT.modules.find(m => !MOD[m].joined); if (m) nudge(MOD[m].btn); return refresh(); }
+    selected = slots[id].shape;
+  }
+  const id = KIT.groups[selected].find(can);
+  refresh();
+  if (pulse) scene.remove(pulse.m);
+  const g = slots[id].ghost, m = new THREE.Mesh(g.geometry, pulseMat); m.matrixAutoUpdate = false; m.matrix.copy(g.matrix); m.renderOrder = 3;
+  scene.add(m); pulse = { m, t0: performance.now() };
+});
+$("b-ghost").addEventListener("click", e => {
+  const on = e.currentTarget.getAttribute("aria-pressed") !== "true"; e.currentTarget.setAttribute("aria-pressed", String(on)); ghostMat.opacity = on ? 0.32 : 0.12;
+});
+
+// ---------- 조립 설명서 (누를 때만): 단계마다 이번 판 + 그림 (앞 단계 = 회색, 이번 = 나무, 화살표 = 끼우는 방향)
+const M = { page: 0, built: false };
+function buildManual() {
+  const view = $("m-view");
+  M.renderer = new THREE.WebGLRenderer({ antialias: true }); M.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+  M.renderer.outputEncoding = THREE.sRGBEncoding; view.appendChild(M.renderer.domElement);
+  M.scene = new THREE.Scene(); M.camera = camera.clone();
+  M.scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8170, 0.9));
+  const l = new THREE.DirectionalLight(0xffffff, 0.8); l.position.set(-300, 600, 450); M.scene.add(l);
+  M.doneMat = new THREE.MeshStandardMaterial({ metalness: 0, roughness: 0.9, flatShading: true, side: THREE.DoubleSide });   // 메시에 법선이 없음 -> 면 그늘로
+  M.meshes = {};
+  for (const s of Object.values(slots)) {
+    const m = new THREE.Mesh(s.ghost.geometry, M.doneMat); m.matrixAutoUpdate = false; m.matrix.copy(s.base); M.scene.add(m); M.meshes[s.id] = m;   // 설명서는 늘 완성 자리
+  }
+  M.arrows = new THREE.Group(); M.scene.add(M.arrows);
+  M.controls = new THREE.OrbitControls(M.camera, M.renderer.domElement); M.controls.target.copy(controls.target); M.controls.enableDamping = true;
+  const fit = () => { const w = view.clientWidth, h = view.clientHeight; if (!w || !h) return; M.renderer.setSize(w, h, false); M.camera.aspect = w / h; M.camera.updateProjectionMatrix(); };
+  new ResizeObserver(fit).observe(view); fit();
+  $("m-dots").innerHTML = KIT.steps.map((_, i) => `<button type="button" aria-label="${i + 1}단계"></button>`).join("");
+  $("m-dots").querySelectorAll("button").forEach((b, i) => b.addEventListener("click", () => showPage(i)));
+  M.built = true;
+}
+function arrow(dir, from, len, color) {                                              // 굵은 화살표 (막대 + 머리), from 에서 dir 쪽으로
+  const g = new THREE.Group(), mat = new THREE.MeshBasicMaterial({ color });
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 2.6, len - 16, 12), mat); shaft.position.y = (len - 16) / 2;
+  const head = new THREE.Mesh(new THREE.ConeGeometry(7.5, 16, 16), mat); head.position.y = len - 8;
+  g.add(shaft, head); g.position.copy(from); g.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize());
+  return g;
+}
+function showPage(i) {
+  M.page = Math.max(0, Math.min(KIT.steps.length - 1, i));
+  const step = KIT.steps[M.page], before = new Set(KIT.steps.slice(0, M.page).flat());
+  M.scene.background = new THREE.Color(cssColor("--paper")); M.doneMat.color.set(cssColor("--done"));
+  for (const [id, m] of Object.entries(M.meshes)) {
+    m.visible = before.has(id) || step.includes(id);
+    m.material = step.includes(id) ? slots[id].mesh.material : M.doneMat;
+  }
+  M.arrows.clear();
+  const accent = new THREE.Color(cssColor("--accent"));
+  for (const id of step) {                                                              // 끼우는 방향 화살표: 판 바깥에서 판 쪽으로
+    const s = slots[id], dir = new THREE.Vector3(...s.insert), c = new THREE.Vector3(...s.center);
+    M.arrows.add(arrow(dir, c.clone().addScaledVector(dir, -78), 54, accent));
+  }
+  const box = new THREE.Box3();                                                         // 이 단계까지 보이는 판 + 화살표에 맞춰 카메라
+  for (const [id, m] of Object.entries(M.meshes)) if (m.visible) { m.geometry.computeBoundingBox(); box.union(m.geometry.boundingBox.clone().applyMatrix4(m.matrix)); }
+  M.arrows.updateMatrixWorld(true); box.expandByObject(M.arrows);
+  const c = box.getCenter(new THREE.Vector3()), sz = box.getSize(new THREE.Vector3());
+  const vf = THREE.MathUtils.degToRad(M.camera.fov / 2), hf = Math.atan(Math.tan(vf) * M.camera.aspect);
+  const halfW = Math.max(sz.x, sz.z) / 2, dist = Math.max(halfW / Math.tan(hf), sz.y / 2 / Math.tan(vf)) * 1.15 + halfW;
+  const dir = M.camera.position.clone().sub(M.controls.target).normalize();
+  M.controls.target.copy(c); M.camera.position.copy(c).addScaledVector(dir, dist); M.controls.update();
+  const counts = {};
+  for (const id of step) counts[slots[id].shape] = (counts[slots[id].shape] || 0) + 1;
+  const scale = 64 / Math.max(...KIT.parts.map(p => Math.max(...p.size)));
+  $("m-parts").innerHTML = Object.entries(counts).map(([sh, n]) =>
+    `<span class="m-part">${partSVG(slots[KIT.groups[sh][0]], scale)}${n > 1 ? `<span class="n">×${n}</span>` : ""}</span>`).join("");
+  $("m-no").textContent = M.page + 1; $("m-of").textContent = "/" + KIT.steps.length;
+  $("m-dots").querySelectorAll("button").forEach((b, k) => {
+    b.classList.toggle("done", KIT.steps[k].every(id => placed.has(id))); if (k === M.page) b.setAttribute("aria-current", "step"); else b.removeAttribute("aria-current");
+  });
+  $("m-prev").disabled = M.page === 0; $("m-next").disabled = M.page === KIT.steps.length - 1;
+  $("live").textContent = `${M.page + 1}단계`;
+}
+function openManual() {
+  if (!KIT) return;
+  $("manual").hidden = false;
+  if (!M.built) buildManual();
+  M.camera.position.copy(camera.position); M.controls.target.copy(controls.target); M.controls.update();
+  const next = KIT.steps.findIndex(st => st.some(id => !placed.has(id)));                 // 아직 덜 끝난 첫 단계부터
+  showPage(next < 0 ? 0 : next);
+}
+$("b-book").addEventListener("click", () => $("manual").hidden ? openManual() : ($("manual").hidden = true));
+$("m-close").addEventListener("click", () => $("manual").hidden = true);
+$("m-prev").addEventListener("click", () => showPage(M.page - 1));
+$("m-next").addEventListener("click", () => showPage(M.page + 1));
+window.addEventListener("keydown", e => {
+  if ($("manual").hidden) return;
+  if (e.key === "ArrowLeft") showPage(M.page - 1); else if (e.key === "ArrowRight") showPage(M.page + 1); else if (e.key === "Escape") $("manual").hidden = true;
+});
+
+const fmt = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+function startClock() { started = performance.now(); timer = setInterval(() => $("s-time").textContent = fmt(Math.floor((performance.now() - started) / 1000)), 500); }
+function finish() {
+  clearInterval(timer); controls.autoRotate = ROT; controls.autoRotateSpeed = 1.2;
+  $("done-stats").innerHTML = demoRun ? `<svg><use href="#i-play"/></svg>` :                  // 자동 조립으로 끝남 = 기록 없음
+    `<svg><use href="#i-clock"/></svg>${$("s-time").textContent}&nbsp;&nbsp;<svg><use href="#i-x"/></svg>${stats.miss}&nbsp;&nbsp;<svg><use href="#i-bulb"/></svg>${stats.hint}`;
+  if (VKITS.has(kitId)) { BUILT.add(kitId); saveBuilt(); }
+  $("b-tomap").hidden = !VKITS.has(kitId);
+  $("done").hidden = false; $("live").textContent = "완성";
+  sfx("done"); startMotion();
+}
+function reset() {
+  stopMotion(); clearOuts(); placed.clear(); selected = null; stats = { miss: 0, hint: 0 }; clearInterval(timer); started = 0; demoRun = false;
+  for (const m of KIT.modules) MOD[m].joined = m === KIT.base;                                // 덩어리는 다시 탁자 위 제자리로
+  for (const s of Object.values(slots)) { s.mesh.visible = false; s.ghost.visible = true; }
+  poseAll(); flights.length = 0; controls.autoRotate = false; $("done").hidden = true; $("s-time").textContent = "0:00"; refresh();
+}
+$("b-reset").addEventListener("click", () => { stopDemo(); reset(); }); $("b-tomap").addEventListener("click", () => switchKit("map")); $("b-again").addEventListener("click", () => { stopDemo(); reset(); });
+
+// ---------- 자동 조립 (누를 때만): 처음부터, 덩어리마다 (바닥 덩어리 먼저) 판을 하나씩 끼우고 다 되면 합침. 다시 누르거나 조립대를 누르면 멈춤
+let demo = null, demoRun = false;
+const playBtn = $("b-play");
+// 자동 조립 빠르기 (1·2·4 배) 와 완성 후 돌기 (켬/끔): 보는 사람 브라우저에 기억
+const SPEEDS = [1, 2, 4]; let SPEED = 1, ROT = true;
+try { SPEED = SPEEDS.includes(+localStorage.getItem("speed")) ? +localStorage.getItem("speed") : 1; ROT = localStorage.getItem("rot") !== "0"; } catch (e) {}
+function showSpeed() { const b = $("b-speed"); b.querySelector(".spd").textContent = SPEED + "×"; b.title = `자동 조립 빠르기 ${SPEED}배`; b.setAttribute("aria-label", b.title); }
+function showRot() { const b = $("b-rot"); b.setAttribute("aria-pressed", String(ROT)); b.title = ROT ? "완성 후 돌기: 켬" : "완성 후 돌기: 끔"; b.setAttribute("aria-label", b.title); }
+$("b-speed").addEventListener("click", () => { SPEED = SPEEDS[(SPEEDS.indexOf(SPEED) + 1) % SPEEDS.length]; showSpeed(); try { localStorage.setItem("speed", SPEED); } catch (e) {} });
+$("b-rot").addEventListener("click", () => { ROT = !ROT; showRot(); if (!$("done").hidden || !ROT) controls.autoRotate = ROT && !$("done").hidden; try { localStorage.setItem("rot", ROT ? "1" : "0"); } catch (e) {} });
+showSpeed(); showRot();
+function setPlay(on) { playBtn.setAttribute("aria-pressed", String(on)); playBtn.innerHTML = `<svg><use href="#i-${on ? "stop" : "play"}"/></svg>`; playBtn.title = on ? "멈춤" : "자동 조립"; playBtn.setAttribute("aria-label", playBtn.title); }
+function stopDemo() { if (!demo) return; clearTimeout(demo.t); demo = null; selected = null; setPlay(false); if (KIT) refresh(); }
+function startDemo() {
+  if (!KIT) return;
+  $("manual").hidden = true; reset(); demoRun = true;
+  demo = { q: demoQueue() };
+  setPlay(true); demo.t = setTimeout(demoStep, 400);
+}
+function demoQueue() {                                                 // 마른 연습 (움직임·소리 없이 규칙만): 덩어리마다 검증된 순서로 놓고 합침.
+  const seq = [];                                                      // 합칠 길을 막는 제 판 (뒤 쐐기 등) 은 빼서 합친 뒤로 미룸
+  const build = m => { let q = KIT.order.filter(id => slots[id].module === m);
+    while (q.length) { const id = q.find(i => !plan(i).blockers); if (!id) break; placed.add(id); seq.push(id); q = q.filter(i => i !== id); } };
+  build(KIT.base);
+  const baseSeq = [...seq], perms = a => a.length < 2 ? [a] : a.flatMap((x, i) => perms([...a.slice(0, i), ...a.slice(i + 1)]).map(p => [x, ...p]));
+  const tryOrder = order => {                                          // 이 덩어리 순서로 다 합쳐지나 (발코니는 지붕 전에, 날개는 지붕 뒤에 등)
+    seq.length = 0; seq.push(...baseSeq); placed.clear(); baseSeq.forEach(x => placed.add(x));
+    for (const m of KIT.modules) MOD[m].joined = m === KIT.base;
+    for (const m of order) {
+      build(m);
+      const jp = joinPlan(m), later = jp.e !== undefined ? [] : jp.blockers ? culprits(m) : null;
+      if (!later || (jp.blockers && !later.length)) return false;
+      for (const x of later) { placed.delete(x); seq.splice(seq.indexOf(x), 1); }
+      MOD[m].joined = true; seq.push("@" + m);
+      for (const x of KIT.order.filter(x => later.includes(x))) { placed.add(x); seq.push(x); }   // 미룬 판은 검증된 순서로
+    }
+    return true;
+  };
+  perms(KIT.modules.filter(m => m !== KIT.base)).find(tryOrder);
+  placed.clear(); for (const m of KIT.modules) MOD[m].joined = m === KIT.base;      // 연습 흔적 지움 (판은 아직 하나도 안 보임)
+  return seq;
+}
+function demoStep() {
+  if (!demo) return;
+  const q = demo.q;
+  if (!q.length) return stopDemo();
+  if (q[0][0] === "@") {                                                                        // 덩어리 하나 끝 -> 합치기
+    const m = q.shift().slice(1);
+    join(m); if (!MOD[m].joined) return stopDemo();
+    demo.t = setTimeout(demoStep, 1300 / SPEED); return;
+  }
+  const j = q.findIndex(id => id[0] !== "@" && !plan(id).blockers);                             // 대개 맨 앞 판 (연습한 순서)
+  if (j < 0 || (j > 0 && q.slice(0, j).some(x => x[0] === "@"))) return stopDemo();
+  const id = q.splice(j, 1)[0], p = plan(id);
+  selected = slots[id].shape; refresh();                                                       // 원판에서 어느 판인지 보이게
+  place(id, p);
+  demo.t = setTimeout(demoStep, (p.lift ? 1150 : 700) / SPEED);
+}
+playBtn.addEventListener("click", () => mapOn ? (mapPeek ? stopPeek() : peekVillage()) : demo ? stopDemo() : startDemo());
+function showDone() {                                                  // 완성 보기 (누를 때만): 자동 조립과 같은 순서를 움직임 없이 한 번에 -> 바로 완성 (움직임·소리)
+  if (!KIT) return;
+  stopDemo(); $("manual").hidden = true; reset(); demoRun = true;
+  for (const x of demoQueue()) { if (x[0] === "@") MOD[x.slice(1)].joined = true; else placed.add(x); }
+  for (const s of Object.values(slots)) { s.ghost.visible = !placed.has(s.id); s.mesh.visible = placed.has(s.id); }
+  poseAll(); flights.length = 0; refresh(); finish();
+}
+$("b-skip").addEventListener("click", showDone);
+
+(function loop(now) {
+  for (let i = 0; i < flights.length;) {                                                        // 앞에서부터: 같은 판이면 나중 움직임이 이김 (화면이 멈췄다 와도 들기 -> 내리기 순서 그대로)
+    const f = flights[i]; if (now < f.t0) { i++; continue; }                                    // 차례를 기다리는 움직임
+    const k = Math.min(1, (now - f.t0) / f.dur), e = 1 - Math.pow(1 - k, 3);
+    f.mesh.position.lerpVectors(f.from, f.to, e); if (k >= 1) flights.splice(i, 1); else i++;
+  }
+  if (pulse) { const k = (now - pulse.t0) / 1400; pulseMat.opacity = k < 1 ? 0.55 * Math.sin(Math.PI * k) : 0; if (k >= 1) { scene.remove(pulse.m); pulse = null; } }
+  if (motion) stepMotion(now);
+  if (drops.length) stepDrops(now);
+  updateBand(); updateBought(); updateBucket(); updateCords();
+  controls.update(); renderer.render(scene, camera); placeButtons();
+  if (M.built && !$("manual").hidden) { M.controls.update(); M.renderer.render(M.scene, M.camera); }
+  requestAnimationFrame(loop);
+})(performance.now());
+
+(async () => {                                                                                    // 올라간 키트만 (data/kits.json 목록)
+  try { const ready = await fetch(`data/kits.json?v=${DATA_V}`).then(r => r.json()); for (let i = KITS.length - 1; i >= 0; i--) if (!ready.includes(KITS[i].id)) { KITS.splice(i, 1); } } catch (e) {}
+  $("kits").querySelectorAll(".icon").forEach(b => { if (b.dataset.kit !== "map" && !KITS.some(k => k.id === b.dataset.kit)) b.remove(); });
+  let first = "map"; try { const k = localStorage.getItem("kit"); if (KITS.some(x => x.id === k)) first = k; } catch (e) {}
+  switchKit(first).catch(e => { $("load").innerHTML = `<span style="color:var(--bad)">${e.message}</span>`; });
+})();
+</script>
