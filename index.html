@@ -42,6 +42,12 @@ body { background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, sans-
 .part .n { position: absolute; right: -2px; top: -2px; min-width: 18px; height: 18px; border-radius: 9px; background: var(--burn); color: var(--birch);
   font: 500 11px/18px var(--mono); text-align: center; padding: 0 4px; }
 .part:disabled .n, .part .n:empty { display: none; }
+.part.stock { padding-bottom: 18px; min-width: 64px; }
+.part.stock svg { margin-inline: auto; }
+.m-part.stock { min-width: 64px; text-align: center; }
+.stock-tag { display: block; color: var(--ink); font: 600 9px/12px var(--mono); text-align: center; white-space: nowrap; }
+.part .stock-tag { position: absolute; left: 2px; right: 2px; bottom: 1px; pointer-events: none; }
+.part.pet:not(:disabled) .fill, .m-part.pet .fill { fill: rgba(174,210,222,.5); stroke: #557f8d; }
 .part.shake { animation: shake .3s; }
 @keyframes shake { 0%,100% { transform: none; } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
 .sheet.nudge { animation: nudge .5s; }
@@ -233,7 +239,7 @@ body { background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, sans-
 
 <script>
 const $ = id => document.getElementById(id);
-const DATA_V = "45-captive";                                                    // 키트 자료 판 (바꿔 올릴 때 올림: 브라우저에 남은 옛 자료와 섞이지 않게)
+const DATA_V = "46-mixed-stock";                                                    // 키트 자료 판 (바꿔 올릴 때 올림: 브라우저에 남은 옛 자료와 섞이지 않게)
 const cssColor = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 let KIT, slots = {}, placed = new Set(), selected = null, stats = { miss: 0, hint: 0 }, timer = null, started = 0;
 
@@ -1103,7 +1109,7 @@ async function loadKit(id) {
   kitRoot.add(svgFix(gltf.scene)); gltf.scene.updateMatrixWorld(true);
   for (const p of meta.parts) {
     const node = gltf.scene.getObjectByName(p.id), mesh = node.isMesh ? node : node.getObjectByProperty("isMesh", true);
-    Object.assign(mesh.material, { side: THREE.DoubleSide, metalness: 0, roughness: 0.82 }); mesh.castShadow = mesh.receiveShadow = true;
+    preparePartMaterial(mesh, p);
     const ghost = new THREE.Mesh(mesh.geometry, ghostMat); ghost.matrixAutoUpdate = false; ghost.matrix.copy(mesh.matrixWorld);
     ghost.userData.id = p.id; ghost.renderOrder = 2; kitRoot.add(ghost);
     const toLocal = new THREE.Matrix4().copy(mesh.parent.matrixWorld).invert();             // 방향 (glTF 세계) -> 판 부모 좌표
@@ -1245,6 +1251,29 @@ const allJoined = () => KIT.modules.every(m => MOD[m].joined) &&
 function checkDone() { if (!bridgeCycle && placed.size === KIT.parts.length && allJoined()) setTimeout(()=>{if(!bridgeCycle && placed.size===KIT?.parts.length && allJoined())finish();},900); }
 
 // ---------- 원판 (같은 모양은 한 조각 + 남은 개수)
+// Mixed-stock presentation: metadata is optional, so legacy cards stay unchanged.
+function stockLabel(p) {
+  if (!Number.isFinite(p.thickness_mm) || p.thickness_mm <= 0) return "";
+  const label = p.material || p.stock_id || p.kind;
+  return `${p.thickness_mm} mm ${label}${p.stock_id && p.stock_id !== label ? ` · ${p.stock_id}` : ""}`;
+}
+const stockEscape = value => String(value).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const stockTag = p => stockLabel(p) ? `<small class="stock-tag">${p.thickness_mm} mm${p.kind === "pet" ? " PET" : ""}</small>` : "";
+function preparePartMaterial(mesh, p) {
+  const clear = p.kind === "pet";
+  Object.assign(mesh.material, { side: THREE.DoubleSide, metalness: 0, roughness: clear ? mesh.material.roughness : 0.82 });
+  if (clear) mesh.material.depthWrite = false;
+  mesh.castShadow = mesh.receiveShadow = !clear;
+}
+function partCard(p, sh, scale) {
+  const stock = stockLabel(p), cls = `part${p.kind === "pet" ? " pet" : ""}${stock ? " stock" : ""}`;
+  return `<button type="button" class="${cls}" data-shape="${sh}" aria-pressed="false" aria-label="판 ${Math.round(p.size[0])}×${Math.round(p.size[1])} mm${stock ? ` · ${stockEscape(stock)}` : ""}"${stock ? ` title="${stockEscape(stock)}"` : ""}>${partSVG(p, scale)}<span class="n"></span>${stockTag(p)}</button>`;
+}
+function manualPart(p, n, scale) {
+  const stock = stockLabel(p);
+  return `<span class="m-part${p.kind === "pet" ? " pet" : ""}${stock ? " stock" : ""}"${stock ? ` title="${stockEscape(stock)}"` : ""}>${partSVG(p, scale)}${n > 1 ? `<span class="n">×${n}</span>` : ""}${stockTag(p)}</span>`;
+}
+// End mixed-stock presentation.
 function partSVG(p, scale) {
   const [ext, ...holes] = p.outline, xs = ext.map(q => q[0]), ys = ext.map(q => q[1]);
   const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
@@ -1258,7 +1287,7 @@ function buildSheet() {
   const shapes = Object.keys(KIT.groups).sort((a, b) => { const A = slots[KIT.groups[a][0]].size, B = slots[KIT.groups[b][0]].size; return B[0] * B[1] - A[0] * A[1]; });
   $("sheet").innerHTML = shapes.map(sh => {
     const p = slots[KIT.groups[sh][0]];
-    return `<button type="button" class="part" data-shape="${sh}" aria-pressed="false" aria-label="판 ${Math.round(p.size[0])}×${Math.round(p.size[1])} mm">${partSVG(p, scale)}<span class="n"></span></button>`;
+    return partCard(p, sh, scale);
   }).join("");
   document.querySelectorAll(".part").forEach(b => b.addEventListener("click", () => { stopBridgeCycle(); stopDemo(); selected = selected === b.dataset.shape ? null : b.dataset.shape; sfx("tick"); refresh(); }));
 }
@@ -1433,7 +1462,12 @@ function buildManual() {
   }
   M.arrows = new THREE.Group(); M.scene.add(M.arrows);
   M.controls = new THREE.OrbitControls(M.camera, M.renderer.domElement); M.controls.target.copy(controls.target); M.controls.enableDamping = true;
-  const fit = () => { const w = view.clientWidth, h = view.clientHeight; if (!w || !h) return; M.renderer.setSize(w, h, false); M.camera.aspect = w / h; M.camera.updateProjectionMatrix(); };
+  const fit = () => {
+    const w = view.clientWidth, h = view.clientHeight; if (!w || !h) return;
+    M.renderer.setSize(w, h, false); M.camera.aspect = w / h; M.camera.updateProjectionMatrix();
+    // New-kit pages can change footer height; refit after its layout settles.
+    if (M.built && !$("manual").hidden && ["railway_terminal", "courtyardpalace", "botanical_conservatory"].includes(KIT.design)) showPage(M.page);
+  };
   new ResizeObserver(fit).observe(view); fit();
   $("m-dots").innerHTML = KIT.steps.map((_, i) => `<button type="button" aria-label="${i + 1}단계"></button>`).join("");
   $("m-dots").querySelectorAll("button").forEach((b, i) => b.addEventListener("click", () => showPage(i)));
@@ -1452,7 +1486,7 @@ function showPage(i) {
   M.scene.background = new THREE.Color(cssColor("--paper")); M.doneMat.color.set(cssColor("--done"));
   for (const [id, m] of Object.entries(M.meshes)) {
     m.visible = before.has(id) || step.includes(id);
-    m.material = step.includes(id) ? slots[id].mesh.material : M.doneMat;
+    m.material = step.includes(id) || slots[id].kind === "pet" ? slots[id].mesh.material : M.doneMat;
   }
   M.arrows.clear();
   const accent = new THREE.Color(cssColor("--accent"));
@@ -1476,7 +1510,7 @@ function showPage(i) {
   for (const id of step) counts[slots[id].shape] = (counts[slots[id].shape] || 0) + 1;
   const scale = 64 / Math.max(...KIT.parts.map(p => Math.max(...p.size)));
   $("m-parts").innerHTML = Object.entries(counts).map(([sh, n]) =>
-    `<span class="m-part">${partSVG(slots[KIT.groups[sh][0]], scale)}${n > 1 ? `<span class="n">×${n}</span>` : ""}</span>`).join("");
+    manualPart(slots[KIT.groups[sh][0]], n, scale)).join("");
   $("m-no").textContent = M.page + 1; $("m-of").textContent = "/" + KIT.steps.length;
   $("m-dots").querySelectorAll("button").forEach((b, k) => {
     b.classList.toggle("done", KIT.steps[k].every(id => placed.has(id))); if (k === M.page) b.setAttribute("aria-current", "step"); else b.removeAttribute("aria-current");
