@@ -129,6 +129,14 @@ body { background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, sans-
   .sheet { grid-row: 2; max-height: 32vh; flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; overflow-y: hidden; align-items: center; }
 }
 @media (prefers-reduced-motion: reduce) { .part.shake, .sheet.nudge, .mark, .load i { animation: none; } .mark { opacity: 1; } }
+.village-switch { position:absolute;left:16px;bottom:16px;z-index:8;max-width:calc(100% - 32px);padding:6px;border:1px solid #b8a887;border-radius:14px;background:rgba(246,239,222,.94);box-shadow:0 3px 12px #49341c20; }
+.village-switch[hidden] { display:none; }
+.village-switch .choices { display:flex;gap:4px; }
+.village-switch button { appearance:none;cursor:pointer;border:0;border-radius:9px;padding:8px 11px;background:transparent;color:#5e503b;font:600 12px/1.3 system-ui,sans-serif;white-space:nowrap; }
+.village-switch button[aria-pressed="true"] { background:#8c7452;color:#fff9ec; }
+.village-switch button:focus-visible { outline:2px solid #4f775e;outline-offset:2px; }
+.village-switch p { margin:5px 5px 1px;color:#75654c;font-size:11px; }
+@media(max-width:760px){.village-switch{left:10px;bottom:10px;max-width:calc(100% - 20px)}.village-switch button{padding:8px 9px;font-size:11px}.village-switch p{font-size:10px}}
 </style>
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -203,6 +211,7 @@ body { background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, sans-
 <div class="app">
   <div class="sheet" id="sheet" role="toolbar" aria-label="부품 원판"></div>
   <div class="stage" id="stage">
+    <nav class="village-switch" id="village-switch" aria-label="마을 풍경 선택" hidden><div class="choices"><button type="button" data-village="market" aria-pressed="false">① 장터 마을</button><button type="button" data-village="water" aria-pressed="false">② 물길 마을</button><button type="button" data-village="woodland" aria-pressed="false">③ 숲·언덕 마을</button></div><p id="village-desc"></p></nav>
     <div class="bar" aria-hidden="true"><i id="bar"></i></div>
     <div class="hud">
       <div class="kits" id="kits" role="group" aria-label="키트"></div>
@@ -241,9 +250,11 @@ body { background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, sans-
   </div>
 </div>
 
+<script src="village_maps.js?v=53-three-maps"></script>
+<script src="village_math.js?v=53-three-maps"></script>
 <script>
 const $ = id => document.getElementById(id);
-const DATA_V = "52-retention-plants";                                                    // 키트 자료 판 (바꿔 올릴 때 올림: 브라우저에 남은 옛 자료와 섞이지 않게)
+const DATA_V = "53-three-maps";                                                    // 키트 자료 판 (바꿔 올릴 때 올림: 브라우저에 남은 옛 자료와 섞이지 않게)
 const cssColor = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 let KIT, slots = {}, placed = new Set(), selected = null, stats = { miss: 0, hint: 0 }, timer = null, started = 0;
 
@@ -754,88 +765,11 @@ const KITS = [{ id: "canal_library", name: "운하 대도서관" }, { id: "terra
 // ---------- 마을 (키트 줄 맨 앞 칸): 판 바닥 위 제자리에 지은 건물이 서고, 안 지은 자리는 흐린 실루엣. 건물을 누르면 그 키트를 조립대에.
 // 다 지으면 (완성) 마을에 섬. 자동 조립 단추 = 안 지은 건물을 판 하나씩 위에서 내려 끼워 보여 줌 (기록 안 함)
 const rnd = seed => () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };   // 씨앗 난수 (나무·배치)
-const VILLAGE = { x0:-410, x1:1250, z0:-860, z1:410, slots:[
-  {kit:"canal_library",x:540,z:-720,rot:0}, {kit:"terrace_monastery",x:820,z:-720,rot:0}, {kit:"bridge_guildhall",x:1100,z:-720,rot:0},
-  // The market is an old, irregular village; the eastern lanes are its planned extension.
-  {kit:"cathedral",x:540,z:-450,rot:0}, {kit:"citadel",x:820,z:-450,rot:0}, {kit:"watergate",x:1100,z:-450,rot:0},
-  {kit:"market_tower",x:-125,z:-145,rot:0}, {kit:"chapel",x:35,z:-178,rot:0},
-  {kit:"smithy",x:175,z:-145,rot:0}, {kit:"bakery",x:-195,z:10,rot:1},
-  {kit:"inn",x:-160,z:165,rot:1}, {kit:"townhouse",x:180,z:80,rot:3},
-  {kit:"market_well",x:0,z:0,rot:0}, {kit:"stall",x:-77,z:-35,rot:0},
-  {kit:"stall",x:50,z:-68,rot:0}, {kit:"gatehouse",x:110,z:370,rot:0},
-  {kit:"market_hall",x:-10,z:-335,rot:0}, {kit:"barn",x:320,z:-325,rot:0},
-  {kit:"house_a",x:320,z:72,rot:3}, {kit:"house_b",x:-155,z:315,rot:2},
-  {kit:"tower_mill",x:-335,z:-190,rot:0}],
-  // Width, centreline, surface. Forecourts meet the existing building bases.
-  roads:[
-    [22,[[435,-580],[1215,-580]]], [24,[[700,-860],[700,-580],[700,-310]]],
-    [16,[[540,-614.2],[540,-580]]], [16,[[820,-629.2],[820,-580]]], [16,[[1100,-636.2],[1100,-580]]],
-    [22,[[1100,-368],[1100,-310],[820,-310]]],
-    [28,[[110,410],[110,300],[115,235],[95,160],[65,110]]],
-    [14,[[105,20],[265,20],[350,0],[700,0],[1210,0]]],
-    [28,[[245,-150],[430,-150],[700,-150],[1210,-150]]],
-    [28,[[245,150],[430,150],[700,150],[1210,150]]],
-    [24,[[700,-310],[700,-150],[700,0],[700,150],[700,285],[700,410]]],
-    [22,[[245,-150],[270,-235],[320,-260],[382,-260],[382,-290],[435,-310],[900,-310]]],
-    [18,[[110,-35],[110,-225],[100,-265]]],
-    [18,[[110,-35],[235,-55],[245,-150]]],
-    [22,[[115,235],[200,200],[245,150]]],
-    [18,[[-10,-300],[-10,-265],[210,-265],[320,-260]]],
-    [16,[[540,-384.75],[540,-310]]], [16,[[820,-360],[820,-310]]],
-    [12,[[320,-282],[320,-260]]],
-    [16,[[-335,-164],[-310,-125],[-220,-95],[-190,-65],[-123,-66]]],
-    [18,[[-155,275],[-155,250],[-65,250],[15,200],[65,110]]],
-    [12,[[-225,90],[-265,85],[-305,70],[-360,85],[-380,145],[-355,205],[-285,215],[-245,175],[-220,100],[-225,90]],"trail"],
-    [12,[[-305,70],[-310,0],[-325,-75],[-335,-164]],"trail"],
-    [12,[[-310,-125],[-265,-125],[-265,-275],[-310,-350],[-325,-435],[-255,-490],[-110,-490],[40,-470],[155,-430],[210,-365],[210,-265]],"trail"],
-    [12,[[430,285],[700,285],[955,285]],"trail"],
-    [10,[[430,150],[420,235],[430,285],[430,365],[580,385],[700,370],[820,385],[955,365],[955,285],[970,230],[970,175],[978,150]],"trail"],
-    // Door paths in the old town, narrower than the public lanes.
-    [12,[[-125,-85],[-125,-65],[-90,-60]]], [12,[[35,-136],[35,-115],[-10,-105],[-20,-85]]],
-    [12,[[175,-114],[175,-60],[110,-35]]], [12,[[-159,10],[-120,10]]],
-    [12,[[-118,165],[-50,165],[-15,115]]], [10,[[147,80],[125,80],[110,60]]],
-    [10,[[291,72],[275,72],[265,20]]]],
-  plazas:[
-    [[-123,-66],[-55,-105],[75,-98],[113,-58],[125,55],[90,115],[-93,115],[-125,65]],
-    [[485,-385],[595,-385],[595,-337],[485,-337]],
-    [[780,-360],[860,-360],[860,-326],[780,-326]]],
-  pond:[-320,145,44], nature:[], props:[], planted:[], placedProps:[],
-  greens:[[-265,-466,112,67],[15,-495,153,43],[-329,10,60,73],[-343,273,45,81],
-          [550,-35,115,22],[550,35,115,22],[845,-35,110,22],[845,35,110,22],
-          [550,342,100,39],[850,342,95,39]],
-  wallGaps:{north:[[700,25]],south:[[110,38],[700,20]],west:[],east:[[-150,23],[0,20],[150,23]],
-            inner:[[-295,32],[-150,23],[0,34],[150,23],[285,19]]}
-};
-{
-  const xs=[460,550,640,750,835,925], zs=[[-208,-212,-204,-210,-207,-215],[-92,-87,-94,-90,-88,-91],
-      [93,91,92,94,90,95],[210,205,207,215,208,211]];
-  let k=1;
-  for(let row=0;row<4;row++)for(let col=0;col<6;col++){
-    const x=xs[col]+[0,-3,3,0,2,-2][col]*(row%2?1:-1),z=zs[row][col],rot=row%2?2:0;
-    const kit=`gh${String(k++).padStart(2,"0")}`;
-    VILLAGE.slots.push({kit,x,z,rot,name:"집"});
-    // The exact doorstep is filled in from the loaded geometry, not a nominal house size.
-  }
-  const R=rnd(2803),put=(kind,x,z,k)=>VILLAGE.nature.push([kind,x,z,k]);
-  for(const [cx,cz,rx,rz,n] of [[-280,-480,108,62,36],[-52,-500,133,37,27],[190,-487,143,55,26],
-        [-325,-328,63,57,15],[355,-495,53,50,9]])
-    for(let i=0;i<n;i++){const a=R()*Math.PI*2,r=Math.sqrt(R());put(R()<.52?"pine":"oak",cx+Math.cos(a)*rx*r,cz+Math.sin(a)*rz*r,.76+R()*.37);}
-  for(const x of [-367,-303])for(const z of [-55,8,68])put("oak",x+(R()-.5)*8,z+(R()-.5)*8,.68+R()*.07);
-  for(const [x,z,k] of [[-375,245,.85],[-350,325,.83],[-277,340,.76],[-230,377,.63],[-40,345,.67],[0,300,.7],[220,315,.73],[315,350,.77]])put("oak",x,z,k);
-  for(const x of [460,550,640,755,840,932])for(const z of [-35,35])put("oak",x+(R()-.5)*8,z,.59+R()*.08);
-  for(const x of [470,565,650,750,842,935]){put("oak",x,-274,.66);put("bush",x+27,-278,.76);}
-  for(const x of [465,525,585,645,755,815,875,935])for(const z of [325,367])put("oak",x+(R()-.5)*8,z+(R()-.5)*6,.49+R()*.08);
-  for(const [x,z] of [[-230,-55],[-222,80],[125,197],[230,-50],[235,83],[255,235],[-50,210],[-80,-275],[-210,-285],[420,-390],[630,-395],[925,-405]])put("oak",x,z,.66+R()*.15);
-  for(let i=0;i<110;i++){
-    const x=VILLAGE.x0+24+R()*(VILLAGE.x1-VILLAGE.x0-48),z=VILLAGE.z0+25+R()*(VILLAGE.z1-VILLAGE.z0-50);
-    put(R()<.76?"bush":"rock",x,z,.55+R()*.36);
-  }
-  for(const [x,z,rot] of [[-91,105,0],[105,-27,1],[-283,190,1],[-366,110,3],[508,23,2],[595,-23,0],[797,23,2],[890,-23,0],[515,-343,2],[850,-333,2],[620,301,0],[820,302,0]])VILLAGE.props.push(["bench",x,z,rot]);
-  for(const [x,z] of [[90,285],[94,204],[134,36],[264,-133],[430,-129],[690,-128],[972,-128],[430,129],[690,128],[972,128],[432,-292],[708,-292],[891,-292]])VILLAGE.props.push(["lamp",x,z,0]);
-  for(const [x,z,rot] of [[130,280,0],[275,0,1],[-291,-128,2],[697,263,0]])VILLAGE.props.push(["sign",x,z,rot]);
-  for(const [x,z,rot] of [[91,322,0],[129,322,0],[-100,92,0],[97,94,0],[446,22,1],[446,-22,1],[949,22,1],[949,-22,1]])VILLAGE.props.push(["planter",x,z,rot]);
-}
-const VKITS = new Set(VILLAGE.slots.map(v => v.kit));
+const villageMath=window.PLY_VILLAGE_MATH;
+let villageId=(()=>{const fromURL=new URLSearchParams(location.search).get('map');let saved;try{saved=localStorage.getItem('village-map');}catch(e){}return window.PLY_VILLAGE_PRESETS.some(m=>m.id===(fromURL||saved))?(fromURL||saved):'market';})();
+let VILLAGE=villageMath.create(villageId),mapBuildTicket=0;
+try{localStorage.setItem('village-map',villageId);}catch(e){}
+const VKITS=new Set(window.PLY_VILLAGE_PRESETS.flatMap(m=>m.slots.map(v=>v.kit)));
 const BUILT = new Set(); try { JSON.parse(localStorage.getItem("built") || "[]").forEach(k => BUILT.add(k)); } catch (e) {}
 const saveBuilt = () => { try { localStorage.setItem("built", JSON.stringify([...BUILT])); } catch (e) {} };
 let mapOn = false, mapRoot = null, mapPeek = null;
@@ -869,48 +803,38 @@ function cut(geo, mat) {                                              // 판 + �
   m.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo, 30), lineMat));
   return m;
 }
-function groundTex() { // Two wood finishes: quiet landscape grain and a readable inset paving network.
-  const {x0,x1,z0,z1}=VILLAGE,N=3072,px=N/(x1-x0),M=Math.round((z1-z0)*px),P=(x,z)=>[(x-x0)*px,(z-z0)*px];
-  const canvas=()=>{const c=document.createElement("canvas");c.width=N;c.height=M;return [c,c.getContext("2d")];};
-  const [c,g]=canvas(),R=rnd(1807);
-  g.fillStyle="#cbb48e";g.fillRect(0,0,N,M);
-  g.strokeStyle="rgba(105,72,39,.085)";g.lineWidth=.65;
-  for(let i=0;i<1700;i++){const x=R()*N,y=R()*M;g.beginPath();g.moveTo(x,y);g.bezierCurveTo(x+12,y-1,x+35,y+2,x+55+R()*90,y);g.stroke();}
-  for(const [x,z,rx,rz] of VILLAGE.greens){const [u,v]=P(x,z);g.fillStyle="rgba(106,119,69,.15)";g.beginPath();for(let i=0;i<48;i++){const a=i/48*Math.PI*2,f=1+.07*Math.sin(3*a+x)+.04*Math.cos(7*a+z),xx=u+Math.cos(a)*rx*px*f,yy=v+Math.sin(a)*rz*px*f;i?g.lineTo(xx,yy):g.moveTo(xx,yy);}g.closePath();g.fill();}
-  g.strokeStyle="rgba(91,72,39,.21)";g.lineWidth=.75;
-  for(let i=0;i<3200;i++){const x=R()*N,y=R()*M,h=(1+R()*1.3)*px;g.beginPath();g.moveTo(x-h*.4,y);g.lineTo(x,y-h);g.lineTo(x+h*.4,y);g.stroke();}
-  for(const [kind,x,z,k] of VILLAGE.planted){if(kind==='rock')continue;const [u,v]=P(x,z),r=(kind==='bush'?7:11)*k*px;g.fillStyle="rgba(111,94,58,.11)";g.beginPath();g.ellipse(u,v,r*1.25,r*.8,.3,0,Math.PI*2);g.fill();}
-  const line=(ctx,pts)=>{ctx.beginPath();pts.forEach((q,i)=>i?ctx.lineTo(...P(...q)):ctx.moveTo(...P(...q)));};
-  const polygon=(ctx,pts)=>{line(ctx,pts);ctx.closePath();};
-  // A narrow gravel finish marks garden/woodland walks, below the street paving.
-  g.lineCap=g.lineJoin='round';
-  for(const [w,pts,type] of VILLAGE.roads)if(type==='trail'){
-    line(g,pts);g.strokeStyle='#b6a17e';g.lineWidth=(w+1.3)*px;g.stroke();
-    line(g,pts);g.strokeStyle='#d8c8a8';g.lineWidth=w*px;g.stroke();
-    line(g,pts);g.strokeStyle='rgba(112,82,47,.23)';g.lineWidth=.7*px;g.setLineDash([1.3*px,5*px]);g.stroke();g.setLineDash([]);
+function groundTex(){
+  const {x0,x1,z0,z1}=VILLAGE,N=2560,px=N/(x1-x0),M=Math.round((z1-z0)*px),P=(x,z)=>[(x-x0)*px,(z-z0)*px];
+  const canvas=()=>{const c=document.createElement('canvas');c.width=N;c.height=M;return [c,c.getContext('2d')];};
+  const [c,g]=canvas(),R=rnd(713);g.fillStyle='#96a282';g.fillRect(0,0,N,M);
+  const path=(ctx,pts)=>{ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(...P(...p)):ctx.moveTo(...P(...p)));};
+  const polygon=(ctx,p)=>{path(ctx,p.outer);ctx.closePath();for(const hole of p.holes){const q=P(...hole[0]);ctx.moveTo(...q);for(const v of hole.slice(1))ctx.lineTo(...P(...v));ctx.closePath();}};
+  // A feathered forest edge, not round lawn stamps or random trees on a rectangular grid.
+  for(const [kind,x,z,k] of VILLAGE.planted){if(kind==='rock')continue;const [u,v]=P(x,z),r=(kind==='bush'?13:32)*k*px,gradient=g.createRadialGradient(u,v,r*.3,u,v,r);gradient.addColorStop(0,'rgba(72,99,58,.15)');gradient.addColorStop(1,'rgba(72,99,58,0)');g.fillStyle=gradient;g.fillRect(u-r,v-r,r*2,r*2);}
+  g.strokeStyle='rgba(82,102,57,.19)';g.lineWidth=.65;
+  for(let i=0;i<7000;i++){const x=R()*N,y=R()*M,h=(1+R()*1.7)*px;g.beginPath();g.moveTo(x-h*.5,y);g.lineTo(x,y-h);g.lineTo(x+h*.5,y);g.stroke();}
+  g.strokeStyle='rgba(101,81,43,.065)';g.lineWidth=.6;
+  for(let i=0;i<900;i++){const x=R()*N,y=R()*M;g.beginPath();g.moveTo(x,y);g.lineTo(x+35+R()*85,y+.7);g.stroke();}
+  for(const p of VILLAGE.waters){polygon(g,p);g.strokeStyle='#c8bf95';g.lineWidth=7*px;g.lineJoin='round';g.stroke();}
+  const [mask,mg]=canvas();mg.fillStyle=mg.strokeStyle='#fff';mg.lineCap=mg.lineJoin=g.lineCap=g.lineJoin='round';
+  for(const p of VILLAGE.plazas){polygon(g,p);g.fillStyle='#b49f78';g.fill('evenodd');polygon(mg,p);mg.fill('evenodd');}
+  for(const [w,pts,kind] of VILLAGE.roads){
+    path(g,pts);g.strokeStyle=kind==='trail'?'#b5b58a':'#ac9a73';g.lineWidth=(w+1.4)*px;g.stroke();
+    path(mg,pts);mg.lineWidth=w*px;mg.stroke();
   }
-  const [mask,mg]=canvas();mg.fillStyle=mg.strokeStyle='#fff';mg.lineCap=mg.lineJoin='round';
-  for(const pts of VILLAGE.plazas){polygon(g,pts);g.fillStyle='#ad9067';g.fill();g.strokeStyle='#97774e';g.lineWidth=1.2*px;g.stroke();polygon(mg,pts);mg.fill();}
-  for(const [w,pts,type] of VILLAGE.roads)if(type!=='trail'){
-    line(g,pts);g.strokeStyle='#9f825b';g.lineWidth=(w+1.6)*px;g.stroke();
-    line(mg,pts);mg.lineWidth=w*px;mg.stroke();
-  }
-  const [paving,pg]=canvas();pg.fillStyle='#dfcfb0';pg.fillRect(0,0,N,M);pg.strokeStyle='rgba(117,87,49,.30)';pg.lineWidth=.65*px;
-  for(let j=0,z=z0;z<z1;j++,z+=11){for(let i=0,x=x0-(j%2)*7;x<x1;i++){
-    const w=11+((i*13+j*7)%5);const [u,v]=P(x,z);pg.beginPath();pg.roundRect(u+.9*px,v+.8*px,(w-1.8)*px,9.4*px,1.6*px);pg.stroke();x+=w;
-  }}
-  pg.globalCompositeOperation='destination-in';pg.drawImage(mask,0,0);g.drawImage(paving,0,0);
-  // The well is the focus of the small market square, rather than an enormous stone carpet.
-  const [wx,wz]=P(0,0);g.strokeStyle='#aa8a5a';g.lineWidth=.8*px;
-  for(const r of [28,35]){g.beginPath();g.arc(wx,wz,r*px,0,Math.PI*2);g.stroke();}
-  for(let i=0;i<20;i++){const a=i/20*Math.PI*2;g.beginPath();g.moveTo(wx+Math.cos(a)*28*px,wz+Math.sin(a)*28*px);g.lineTo(wx+Math.cos(a)*35*px,wz+Math.sin(a)*35*px);g.stroke();}
-  g.strokeStyle='rgba(102,68,35,.55)';g.lineWidth=1.4*px;g.strokeRect(10*px,10*px,N-20*px,M-20*px);
+  const [tile,tg]=canvas();tg.fillStyle='#e2d3ae';tg.fillRect(0,0,N,M);tg.strokeStyle='rgba(119,98,59,.22)';tg.lineWidth=.6*px;
+  for(let j=0,z=z0;z<z1;j++,z+=10)for(let i=0,x=x0-(j%2)*6;x<x1;i++){const w=11+(i*7+j*3)%4,[u,v]=P(x,z);tg.beginPath();tg.roundRect(u+px,v+px,(w-2)*px,8*px,1.7*px);tg.stroke();x+=w;}
+  tg.globalCompositeOperation='destination-in';tg.drawImage(mask,0,0);g.drawImage(tile,0,0);
+  // The paving is centred on the well, whose location is different in each map.
+  const [wx,wz]=P(...VILLAGE.well);g.strokeStyle='#b19a6f';g.lineWidth=.8*px;for(const r of [28,35]){g.beginPath();g.arc(wx,wz,r*px,0,Math.PI*2);g.stroke();}
   const tx=new THREE.CanvasTexture(c);tx.encoding=THREE.sRGBEncoding;tx.anisotropy=renderer.capabilities.getMaxAnisotropy();return tx;
 }
 // 자연: 교차 세로판과 소수의 얇은 수관 판. 나무 한 그루가 수십 장의 원판 더미로 보이지 않게 한다.
 // 키트의 쌓은 원판과 같은 결 (옆면 = 옅은 탄 색)
 const sliceMat = [birchMat, new THREE.MeshStandardMaterial({ color: 0xc8a67c, roughness: 0.9, metalness: 0 })];
-const leafMat = [new THREE.MeshStandardMaterial({ color: 0xe8d7b4, roughness: 0.85, metalness: 0 }), sliceMat[1]];
+const leafMat = [new THREE.MeshStandardMaterial({ color: 0xa6b586, roughness: 0.85, metalness: 0 }), sliceMat[1]];
+const pineLeafMat=[new THREE.MeshStandardMaterial({color:0x82976f,roughness:.9}),sliceMat[1]];
+leafMat[0].color.set(0x91a07b).convertSRGBToLinear();pineLeafMat[0].color.set(0x6c8264).convertSRGBToLinear();
 function blob(r, R, pts = 44, k = 6, amp = 0.13, star = 0) {           // 물결 (잎 덩어리) / 별 (바늘잎) 윤곽
   const sh = new THREE.Shape(), p1 = R() * 6.28, p2 = R() * 6.28, p3 = R() * 6.28;
   for (let i = 0; i < pts; i++) {
@@ -940,13 +864,14 @@ function upright(shape,t,y=0,rotation=0,mat=leafMat){
   const m=new THREE.Mesh(geo,mat);m.position.y=y;m.rotation.y=rotation;m.castShadow=m.receiveShadow=true;return m;
 }
 function tree(x,z,s,kind="oak",seed=1){
+  const foliage=kind==='pine'?pineLeafMat:leafMat;
   const g=new THREE.Group(),R=rnd(Math.floor(seed*7919)%2147483646+1);
   g.add(trunk(kind==='pine'?40:43,2.4,kind!=='pine'));
   if(kind==='pine'){
     const sh=new THREE.Shape(),pts=[[0,66],[-5,52],[-2,53],[-11,39],[-6,41],[-17,24],[-10,27],[-21,12],[0,16],[21,12],[10,27],[17,24],[6,41],[11,39],[2,53],[5,52]];
     pts.forEach(([a,b],i)=>i?sh.lineTo(a,b):sh.moveTo(a,b));sh.closePath();
-    g.add(upright(sh,1.6,0,0),upright(sh,1.6,0,Math.PI/2));
-    for(const [y,r] of [[20,18],[34,12],[48,6.8]])g.add(slab(blob(r,R,16,0,0,1),1.3,y,0,0,leafMat,y*.13));
+    g.add(upright(sh,1.6,0,0,foliage),upright(sh,1.6,0,Math.PI/2,foliage));
+    for(const [y,r] of [[20,18],[34,12],[48,6.8]])g.add(slab(blob(r,R,16,0,0,1),1.3,y,0,0,foliage,y*.13));
   }else{
     const sh=blob(23,R,40,5,.09);
     const make=rotation=>{const m=upright(sh,1.5,43,rotation);m.geometry.scale(1,.73,1);return m;};
@@ -993,40 +918,28 @@ function mapProp(kind,x,z,rot){
 const villageDistance=(x,z,a,b)=>{const dx=b[0]-a[0],dz=b[1]-a[1],t=Math.max(0,Math.min(1,((x-a[0])*dx+(z-a[1])*dz)/(dx*dx+dz*dz||1)));return Math.hypot(x-a[0]-t*dx,z-a[1]-t*dz);};
 function villageInside(x,z,poly){let inside=false;for(let i=0,j=poly.length-1;i<poly.length;j=i++){const a=poly[i],b=poly[j];if((a[1]>z)!==(b[1]>z)&&x<(b[0]-a[0])*(z-a[1])/(b[1]-a[1])+a[0])inside=!inside;}return inside;}
 function villageClear(x,z,r,plazas=true){
-  if(x-r<VILLAGE.x0+13||x+r>VILLAGE.x1-13||z-r<VILLAGE.z0+13||z+r>VILLAGE.z1-13)return false;
-  for(const v of VILLAGE.slots){const b=v.footprint;if(b&&Math.hypot(Math.max(b[0]-x,0,x-b[2]),Math.max(b[1]-z,0,z-b[3]))<r+5)return false;}
-  for(const [w,pts] of VILLAGE.roads)for(let i=1;i<pts.length;i++)if(villageDistance(x,z,pts[i-1],pts[i])<r+w/2+2)return false;
-  if(plazas)for(const poly of VILLAGE.plazas){if(villageInside(x,z,poly))return false;for(let i=0;i<poly.length;i++)if(villageDistance(x,z,poly[i],poly[(i+1)%poly.length])<r+3)return false;}
-  if(Math.hypot(x-VILLAGE.pond[0],z-VILLAGE.pond[1])<VILLAGE.pond[2]+r+11)return false;
-  // The inner boundary has real openings for paths; trunks and props do not pierce its remaining segments.
-  if(Math.abs(x-403)<r+4&&!VILLAGE.wallGaps.inner.some(([at,half])=>Math.abs(z-at)+r<half))return false;
+  if(x-r<VILLAGE.x0+16||x+r>VILLAGE.x1-16||z-r<VILLAGE.z0+16||z+r>VILLAGE.z1-16)return false;
+  for(const v of VILLAGE.slots)if(villageMath.polygonDistance(x,z,v.plot)<r+5)return false;
+  for(const [w,pts] of VILLAGE.roads)for(let i=1;i<pts.length;i++)if(villageDistance(x,z,pts[i-1],pts[i])<r+w/2+3)return false;
+  if(plazas)for(const p of VILLAGE.plazas)if(villageMath.polygonDistance(x,z,p.outer)<r+3&&!p.holes.some(h=>villageInside(x,z,h)))return false;
+  if(villageMath.waterDistance(VILLAGE,x,z)<r+7)return false;
+  for(const g of VILLAGE.gardens)if(villageMath.polygonDistance(x,z,g.polygon)<r+4)return false;
+  for(const b of VILLAGE.bridges)if(villageDistance(x,z,b.a,b.b)<b.width/2+r+5)return false;
   return true;
 }
 function decorateVillage(){
-  for(const v of VILLAGE.slots)if(v.kit.startsWith('gh')){
-    const b=v.footprint,front=v.rot===0?b[3]+.8:b[1]-.8,lane=v.z<0?-150:150;
-    VILLAGE.roads.push([8,[[v.x,front],[v.x,lane]],'door']);
-  }
-  for(const [width,points] of VILLAGE.roads)for(const end of [0,points.length-1]){
-    const p=points[end],next=points[end===0?1:points.length-2],dx=next[0]-p[0],dz=next[1]-p[1],len=Math.hypot(dx,dz);if(!len)continue;
-    for(let n=0;n<width+8;n++){
-      const near=VILLAGE.slots.some(v=>{const b=v.footprint;return v.kit!=='gatehouse'&&Math.hypot(Math.max(b[0]-p[0],0,p[0]-b[2]),Math.max(b[1]-p[1],0,p[1]-b[3]))<width/2+.65;});
-      if(!near)break;p[0]+=dx/len*.5;p[1]+=dz/len*.5;
-    }
-  }
   const used=[];VILLAGE.placedProps=[];VILLAGE.planted=[];
   for(const [kind,x,z,rot] of VILLAGE.props){
     const r={bench:10.5,lamp:6,sign:8,planter:8.5}[kind],candidates=[[x,z]];
-    for(const distance of [4,8,12,16,20,24])for(let i=0;i<12;i++){const a=i*Math.PI/6;candidates.push([x+Math.cos(a)*distance,z+Math.sin(a)*distance]);}
-    const site=candidates.find(([a,b])=>villageClear(a,b,r,false)&&Math.hypot(a,b)>r+37&&!used.some(([c,d,r0])=>Math.hypot(a-c,b-d)<r+r0+2));
-    if(!site)continue;const [a,b]=site;
-    VILLAGE.placedProps.push([kind,a,b,rot,r]);mapRoot.add(mapProp(kind,a,b,rot));used.push([a,b,r]);
+    for(const distance of [8,16,24])for(let i=0;i<12;i++){const a=i*Math.PI/6;candidates.push([x+Math.cos(a)*distance,z+Math.sin(a)*distance]);}
+    const site=candidates.find(([a,b])=>villageClear(a,b,r,false)&&!used.some(([c,d,r0])=>Math.hypot(a-c,b-d)<r+r0+3));if(!site)continue;
+    const [a,b]=site,obj=mapProp(kind,a,b,rot);obj.position.y=villageMath.heightAt(VILLAGE,a,b);mapRoot.add(obj);VILLAGE.placedProps.push([kind,a,b,rot,r]);used.push([a,b,r]);
   }
   for(const [kind,x,z,k] of VILLAGE.nature){
     const r=({oak:28,pine:22,bush:15,rock:10}[kind])*k;
-    if(!villageClear(x,z,r)||used.some(([a,b,r0])=>Math.hypot(x-a,z-b)<(r+r0)*.82))continue;
+    if(!villageClear(x,z,r)||used.some(([a,b,r0])=>Math.hypot(x-a,z-b)<(r+r0)*.86))continue;
     const obj=kind==='bush'?bush(x,z,k,VILLAGE.planted.length+3):kind==='rock'?rock(x,z,k,VILLAGE.planted.length+5):tree(x,z,k,kind,VILLAGE.planted.length+1);
-    obj.userData.decorKind=kind;obj.userData.clearanceRadius=r;mapRoot.add(obj);VILLAGE.planted.push([kind,x,z,k,r]);used.push([x,z,r]);
+    obj.userData.decorKind=kind;obj.userData.clearanceRadius=r;obj.position.y=villageMath.heightAt(VILLAGE,x,z);mapRoot.add(obj);VILLAGE.planted.push([kind,x,z,k,r]);used.push([x,z,r]);
   }
 }
 function walls(h) {                                                   // 낮은 담 + 기둥 머리. 바깥 둘레 + 옛 마을 동쪽 담 (안쪽 담). 문·길 자리는 트임
@@ -1061,7 +974,7 @@ function pond([x, z, r]) {                                            // 연못:
   return g;
 }
 function fitMap(){ // Fit projected geometry, including the near board corner and tall landmarks.
-  const {x0,x1,z0,z1}=VILLAGE,target=new THREE.Vector3((x0+x1)/2,45,(z0+z1)/2),dir=new THREE.Vector3(1,1.35,1).normalize();
+  const {x0,x1,z0,z1}=VILLAGE,target=new THREE.Vector3((x0+x1)/2,45,(z0+z1)/2),dir=new THREE.Vector3(.65,1.8,1).normalize();
   const right=new THREE.Vector3().crossVectors(new THREE.Vector3(0,1,0),dir).normalize(),up=new THREE.Vector3().crossVectors(dir,right);
   const vf=THREE.MathUtils.degToRad(camera.fov/2),hf=Math.atan(Math.tan(vf)*camera.aspect);let dist=1;
   mapRoot.updateMatrixWorld(true);
@@ -1074,33 +987,95 @@ function fitMap(){ // Fit projected geometry, including the near board corner an
   dist*=1.13;controls.target.copy(target);camera.position.copy(target).addScaledVector(dir,dist);
   camera.near=dist/100;camera.far=dist*20;camera.updateProjectionMatrix();controls.update();
 }
-async function buildMap() {
-  mapRoot = new THREE.Group(); scene.add(mapRoot);
-  const { x0, x1, z0, z1 } = VILLAGE, W = x1 - x0, D = z1 - z0, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, T = 14;
-  const top = new THREE.MeshStandardMaterial({ color: SVG ? 0xc8b08a : 0xffffff, roughness: 0.88, metalness: 0 });   // SVG 는 무늬 (질감) 를 못 그림
-  const board = new THREE.Mesh(new THREE.BoxGeometry(W, T, D), [burnMat, burnMat, top, burnMat, burnMat, burnMat]);
-  board.position.set(cx, -T / 2 - 0.01, cz); board.receiveShadow = true; mapRoot.add(board);
-  const lip = cut(new THREE.BoxGeometry(W + 10, 4, D + 10), birchMat); lip.position.set(cx, -T - 2, cz); mapRoot.add(lip);
-  mapRoot.add(walls(14), pond(VILLAGE.pond));
-
-  const SC = Object.fromEntries(await Promise.all([...VKITS].map(id => glbScene(id).then(sc => [id, sc], () => [id, null]))));   // 아직 안 올라간 키트는 자리만 비움
-  VILLAGE.slots.forEach((v, i) => {
-    if (!SC[v.kit]) return;
-    const src = SC[v.kit], solid = src.clone(true); let ghost = SVG ? null : src.clone(true);
-    solid.traverse(o => { if (o.isMesh) { o.material = o.material.clone(); Object.assign(o.material, { side: THREE.DoubleSide, metalness: 0, roughness: 0.82 }); o.castShadow = o.receiveShadow = true; } });
-    if (ghost) ghost.traverse(o => { if (o.isMesh) { o.material = mapGhostMat; o.castShadow = false; o.renderOrder = 2; } });
-    solid.updateMatrixWorld(true);
-    const box = new THREE.Box3().setFromObject(solid), c = box.getCenter(new THREE.Vector3());
-    for (const o of [solid, ghost]) if (o) o.position.sub(new THREE.Vector3(c.x, box.min.y, c.z));   // glTF 뿌리의 제 자리는 두고 밀기
-    const sz = box.getSize(new THREE.Vector3()), hit = new THREE.Mesh(new THREE.BoxGeometry(sz.x, sz.y, sz.z), hitMat); hit.position.y = sz.y / 2;   // 누를 자리 (판 사이 틈도)
-    if (!ghost) { ghost = new THREE.Mesh(new THREE.BoxGeometry(sz.x, sz.y, sz.z), mapGhostMat); ghost.position.y = sz.y / 2; ghost.renderOrder = 2; }   // SVG: 실루엣은 상자 하나 (판 수만 장을 CPU 로는 못 그림)
-    const drop = new THREE.Group(); drop.add(solid, ghost);                               // 건물 한 채 (판 + 실루엣)
-    const holder = new THREE.Group(); holder.add(drop, hit); v.hit = hit; holder.position.set(v.x, 0, v.z); holder.rotation.y = v.rot * Math.PI / 2;
-    holder.userData.slot = i; Object.assign(v, { holder, solid, ghost }); mapRoot.add(holder);
-    holder.updateMatrixWorld(true);const footprint=new THREE.Box3().setFromObject(hit);v.footprint=[footprint.min.x,footprint.min.z,footprint.max.x,footprint.max.z];
+function villageShape(p){
+  const sh=new THREE.Shape();p.outer.forEach(([x,z],i)=>i?sh.lineTo(x,-z):sh.moveTo(x,-z));sh.closePath();
+  for(const ring of p.holes){const h=new THREE.Path();ring.forEach(([x,z],i)=>i?h.lineTo(x,-z):h.moveTo(x,-z));h.closePath();sh.holes.push(h);}return sh;
+}
+function villageTerrain(top){
+  const m=VILLAGE,W=m.x1-m.x0,D=m.z1-m.z0,geo=new THREE.PlaneGeometry(W,D,SVG?40:268,SVG?30:202);geo.rotateX(-Math.PI/2);
+  const a=geo.attributes.position,colors=[];
+  for(let i=0;i<a.count;i++){const x=a.getX(i),z=a.getZ(i),h=villageMath.heightAt(m,x,z);a.setY(i,h);
+    const contour=h>3&&Math.abs(h/3-Math.round(h/3))<.10?.93:1;colors.push(contour,contour,contour);
+  }
+  geo.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));geo.computeVertexNormals();geo.computeBoundingBox();top.vertexColors=true;
+  const mesh=new THREE.Mesh(geo,top);mesh.receiveShadow=true;mesh.userData.terrain=true;mapRoot.add(mesh);
+  // The relief is supported by a real board skirt rather than floating above a flat base.
+  const pos=[],ix=[];
+  for(const [a,b] of [[[m.x0,m.z0],[m.x1,m.z0]],[[m.x1,m.z0],[m.x1,m.z1]],[[m.x1,m.z1],[m.x0,m.z1]],[[m.x0,m.z1],[m.x0,m.z0]]]){
+    for(let i=0;i<100;i++){const p=[a[0]+(b[0]-a[0])*i/100,a[1]+(b[1]-a[1])*i/100],q=[a[0]+(b[0]-a[0])*(i+1)/100,a[1]+(b[1]-a[1])*(i+1)/100],k=pos.length/3;
+      pos.push(p[0],-4,p[1],q[0],-4,q[1],q[0],villageMath.heightAt(m,...q),q[1],p[0],villageMath.heightAt(m,...p),p[1]);ix.push(k,k+2,k+1,k,k+3,k+2);
+    }
+  }
+  const skirt=new THREE.BufferGeometry();skirt.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));skirt.setIndex(ix);skirt.computeVertexNormals();mapRoot.add(new THREE.Mesh(skirt,new THREE.MeshStandardMaterial({color:0xb09065,roughness:.94,side:THREE.DoubleSide})));
+}
+function villageBridge(b){
+  const a=new THREE.Vector3(b.a[0],0,b.a[1]),c=new THREE.Vector3(b.b[0],0,b.b[1]),L=a.distanceTo(c),g=new THREE.Group(),n=Math.ceil(L/7),step=L/n;
+  const plank=(w,h,d,x,y,z)=>{const o=cut(new THREE.BoxGeometry(w,h,d),birchMat);o.position.set(x,y,z);g.add(o);};
+  for(let i=0;i<n;i++)plank(b.width,1.6,step-.25,0,b.deckY-.8,-L/2+(i+.5)*step);
+  for(const x of [-b.width/2-1,b.width/2+1]){
+    for(const z of [-L/2+4,0,L/2-4])plank(1.8,8.5,1.8,x,b.deckY+4.25,z);
+    plank(1.5,1.8,L,x,b.deckY+7.2,0);
+  }
+  for(const sign of [-1,1])for(let i=0;i<3;i++)plank(b.width,.8,4,0,2.4-i*.8-.4,sign*(L/2+2+i*4));
+  g.position.copy(a.clone().add(c).multiplyScalar(.5));g.rotation.y=Math.atan2(c.x-a.x,c.z-a.z);g.userData.bridge=true;mapRoot.add(g);
+}
+function villageWater(){
+  const material=new THREE.MeshStandardMaterial({color:0x6f9da4,roughness:.37,metalness:0,side:THREE.DoubleSide});
+  material.color.convertSRGBToLinear();
+  for(const p of VILLAGE.waters){const w=slab(villageShape(p),.9,-1.1,0,0,material);w.userData.water=true;w.receiveShadow=true;w.castShadow=false;mapRoot.add(w);
+    // The fine edge line follows the generated shoreline; no cylindrical lake or square water stamp.
+    const pts=p.outer.map(([x,z])=>new THREE.Vector3(x,-.14,z));mapRoot.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),new THREE.LineBasicMaterial({color:0x638f98,transparent:true,opacity:.5})));
+  }
+  VILLAGE.bridges.forEach(villageBridge);
+}
+function villageGardens(){
+  const soil=new THREE.MeshStandardMaterial({color:0x9b8867,roughness:1});soil.color.convertSRGBToLinear();
+  for(const g of VILLAGE.gardens){
+    const root=new THREE.Group(),w=g.width,d=g.depth,plank=(a,b,c,x,y,z)=>{const o=cut(new THREE.BoxGeometry(a,b,c),birchMat);o.position.set(x,y,z);root.add(o);};
+    const sh=new THREE.Shape();sh.moveTo(-w/2,-d/2);sh.lineTo(w/2,-d/2);sh.lineTo(w/2,d/2);sh.lineTo(-w/2,d/2);sh.closePath();root.add(slab(sh,1.2,.1,0,0,soil));
+    // The garden is open toward its house; three low fences frame the rear plot.
+    for(const x of [-w/2,w/2]){for(const z of [-d/2,0,d/2])plank(1.5,6,1.5,x,3,z);for(const h of [2.5,5])plank(1.1,1.2,d,x,h,0);}
+    for(const h of [2.5,5])plank(w,1.2,1.1,0,h,-d/2);
+    const leaf=new THREE.Shape();leaf.moveTo(0,0);leaf.quadraticCurveTo(-2.4,2.5,-1,4.6);leaf.quadraticCurveTo(2.5,4.6,0,0);
+    for(const x of [-w*.28,0,w*.28])for(const z of [-d*.26,d*.26])for(const a of [0,Math.PI/2]){const o=upright(leaf,.8,1.3,a,leafMat);o.position.x=x;o.position.z=z;root.add(o);}
+    root.position.set(g.x,g.y,g.z);root.rotation.y=g.rot*Math.PI/2;root.userData.garden=true;mapRoot.add(root);
+  }
+}
+function villageEntryFence(){
+  const gate=VILLAGE.slots.find(v=>v.kit==='gatehouse');
+  for(const [lo,hi] of [[-235,-48],[48,235]]){
+    const n=Math.ceil((hi-lo)/22),y=villageMath.heightAt(VILLAGE,gate.x+(lo+hi)/2,570);
+    for(let i=0;i<=n;i++){const o=cut(new THREE.BoxGeometry(2.2,9,2.2),birchMat);o.position.set(gate.x+lo+(hi-lo)*i/n,y+4.5,570);mapRoot.add(o);}
+    for(const h of [3,6.5]){const o=cut(new THREE.BoxGeometry(hi-lo,1.5,1.2),birchMat);o.position.set(gate.x+(lo+hi)/2,y+h,570);mapRoot.add(o);}
+  }
+}
+function disposeVillage(){
+  if(!mapRoot)return;
+  const protectedGeometry=mapRoot.userData.sharedGeometry||new Set(),shared=new Set([birchMat,burnMat,mapGhostMat,hitMat,lineMat,...sliceMat,...leafMat,...pineLeafMat]);
+  const geo=new Set(),mat=new Set();mapRoot.traverse(o=>{if(o.geometry&&!protectedGeometry.has(o.geometry))geo.add(o.geometry);for(const m of Array.isArray(o.material)?o.material:[o.material])if(m&&!shared.has(m))mat.add(m);});
+  if(mapRoot.userData.groundTexture)mapRoot.userData.groundTexture.dispose();geo.forEach(g=>g.dispose());mat.forEach(m=>m.dispose());scene.remove(mapRoot);mapRoot=null;
+}
+async function buildMap(){
+  const ticket=++mapBuildTicket,layout=VILLAGE;
+  const SC=Object.fromEntries(await Promise.all([...VKITS].map(id=>glbScene(id).then(sc=>[id,sc],()=>[id,null]))));
+  if(ticket!==mapBuildTicket||layout!==VILLAGE||!mapOn)return false;
+  mapRoot=new THREE.Group();mapRoot.userData.mapId=layout.id;mapRoot.userData.sharedGeometry=new Set();scene.add(mapRoot);
+  const W=layout.x1-layout.x0,D=layout.z1-layout.z0,board=new THREE.Mesh(new THREE.BoxGeometry(W+6,14,D+6),burnMat);board.position.y=-11;board.receiveShadow=true;mapRoot.add(board);
+  const lip=cut(new THREE.BoxGeometry(W+12,3,D+12),birchMat);lip.position.y=-19.5;mapRoot.add(lip);
+  layout.slots.forEach((v,i)=>{
+    if(!SC[v.kit])return;const src=SC[v.kit],solid=src.clone(true);let ghost=SVG?null:src.clone(true);
+    solid.traverse(o=>{if(o.isMesh){mapRoot.userData.sharedGeometry.add(o.geometry);o.material=o.material.clone();Object.assign(o.material,{side:THREE.DoubleSide,metalness:0,roughness:.82});o.castShadow=o.receiveShadow=true;}});
+    if(ghost)ghost.traverse(o=>{if(o.isMesh){o.material=mapGhostMat;o.castShadow=false;o.renderOrder=2;}});
+    solid.updateMatrixWorld(true);const box=new THREE.Box3().setFromObject(solid),center=box.getCenter(new THREE.Vector3());
+    for(const o of [solid,ghost])if(o)o.position.sub(new THREE.Vector3(center.x,box.min.y,center.z));
+    const sz=box.getSize(new THREE.Vector3()),hit=new THREE.Mesh(new THREE.BoxGeometry(sz.x,sz.y,sz.z),hitMat);hit.position.y=sz.y/2;
+    if(!ghost){ghost=new THREE.Mesh(new THREE.BoxGeometry(sz.x,sz.y,sz.z),mapGhostMat);ghost.position.y=sz.y/2;ghost.renderOrder=2;}
+    const drop=new THREE.Group();drop.add(solid,ghost);const holder=new THREE.Group();holder.add(drop,hit);holder.position.set(v.x,v.y,v.z);holder.rotation.y=v.rot*Math.PI/2;holder.userData.slot=i;
+    Object.assign(v,{holder,solid,ghost,hit});mapRoot.add(holder);holder.updateMatrixWorld(true);const actual=new THREE.Box3().setFromObject(hit);v.actualFootprint=[actual.min.x,actual.min.z,actual.max.x,actual.max.z];
   });
-  decorateVillage();if(!SVG){top.map=groundTex();top.needsUpdate=true;}
-  showVillage();
+  decorateVillage();const top=new THREE.MeshStandardMaterial({color:SVG?0xbac69e:0xffffff,roughness:.95,metalness:0,side:THREE.DoubleSide});
+  if(!SVG){top.map=groundTex();mapRoot.userData.groundTexture=top.map;}
+  villageTerrain(top);villageWater();villageGardens();villageEntryFence();showVillage();return true;
 }
 function showVillage() {                                              // 지은 건물만 (판은 모두 제자리), 나머지는 실루엣
   drops.length = 0;
@@ -1118,12 +1093,28 @@ function mapSun(on) {                                                 // 마을:
   Object.assign(c, { left: -r, right: r, top: r, bottom: -r, far: on ? 3200 : SUN0.cam.far }); c.updateProjectionMatrix();
   sun.shadow.mapSize.set(on ? 4096 : 2048, on ? 4096 : 2048); if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; }
 }
-async function enterMap() {
-  mapOn = true; document.querySelector(".app").classList.add("map"); resize(); mapSun(true);
-  if (!mapRoot) await buildMap(); else { mapRoot.visible = true; showVillage(); }
-  fitMap(); controls.autoRotate = false;
+function villageControls(){
+  const nav=$('village-switch');nav.hidden=!mapOn;
+  nav.querySelectorAll('[data-village]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.village===villageId)));
+  $('village-desc').textContent=VILLAGE.subtitle;
 }
-function leaveMap() { stopPeek(); mapSun(false); mapOn = false; document.querySelector(".app").classList.remove("map"); stage.classList.remove("over"); stage.title = ""; if (mapRoot) mapRoot.visible = false; resize(); }
+async function changeVillage(id){
+  if(!window.PLY_VILLAGE_PRESETS.some(m=>m.id===id)||id===villageId)return;
+  stopPeek();++mapBuildTicket;disposeVillage();villageId=id;VILLAGE=villageMath.create(id);villageControls();
+  try{localStorage.setItem('village-map',id);}catch(e){}
+  const url=new URL(location.href);url.searchParams.set('map',id);history.replaceState(null,'',url);stage.classList.remove('over');stage.title='';
+  if(!mapOn)return;$('load').hidden=false;const built=await buildMap();
+  if(built&&mapOn&&villageId===id){mapSun(true);fitMap();$('load').hidden=true;}
+}
+for(const type of ['pointerdown','pointerup','click','wheel'])$('village-switch').addEventListener(type,e=>e.stopPropagation());
+$('village-switch').querySelectorAll('[data-village]').forEach(b=>b.addEventListener('click',()=>changeVillage(b.dataset.village)));
+async function enterMap(){
+  mapOn=true;document.querySelector('.app').classList.add('map');resize();mapSun(true);villageControls();
+  if(!mapRoot)await buildMap();else{mapRoot.visible=true;showVillage();}
+  if(mapOn&&mapRoot){fitMap();controls.autoRotate=false;}
+}
+function leaveMap(){stopPeek();++mapBuildTicket;mapSun(false);mapOn=false;villageControls();document.querySelector('.app').classList.remove('map');stage.classList.remove('over');stage.title='';if(mapRoot)mapRoot.visible=false;resize();}
+new ResizeObserver(()=>{if(mapOn&&mapRoot)fitMap();}).observe(stage);
 function stopPeek() { if (!mapPeek) return; clearTimeout(mapPeek.t); mapPeek = null; setPlay(false); controls.autoRotate = false; showVillage(); }
 const KJ = {};
 const kitMeta = id => KJ[id] ||= fetch(`data/${id}/kit.json?v=${DATA_V}`).then(r => r.json());
@@ -1214,7 +1205,7 @@ async function switchKit(id) {
   if (id === "map") {
     document.querySelectorAll("#kits .icon").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.kit === id)));
     try { localStorage.setItem("kit", id); } catch (e) {}
-    await enterMap(); $("load").hidden = true; return;
+    await enterMap(); if(kitId==="map") $("load").hidden = true; return;
   }
   document.querySelectorAll("#kits .icon").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.kit === id)));
   try { localStorage.setItem("kit", id); } catch (e) {}
