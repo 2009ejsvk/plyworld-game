@@ -240,7 +240,7 @@ body { background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, sans-
 
 <script>
 const $ = id => document.getElementById(id);
-const DATA_V = "49-watergate";                                                    // 키트 자료 판 (바꿔 올릴 때 올림: 브라우저에 남은 옛 자료와 섞이지 않게)
+const DATA_V = "50-watergate";                                                    // 키트 자료 판 (바꿔 올릴 때 올림: 브라우저에 남은 옛 자료와 섞이지 않게)
 const cssColor = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 let KIT, slots = {}, placed = new Set(), selected = null, stats = { miss: 0, hint: 0 }, timer = null, started = 0;
 
@@ -275,7 +275,7 @@ function recolor() { scene.background = new THREE.Color(cssColor("--stage")); gh
 recolor();
 const mq = window.matchMedia("(prefers-color-scheme: dark)"); if (mq.addEventListener) mq.addEventListener("change", recolor);
 new MutationObserver(recolor).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-const resize = () => { const w = stage.clientWidth, h = stage.clientHeight; if (!w || !h) return; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); };
+const resize = () => { const w = stage.clientWidth, h = stage.clientHeight; if (!w || !h) return; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); if (KIT?.design === "watergate" && !mapOn && !bridgeCycle && !demo && !bridgeState?.busy && placed.size === KIT.plates && allJoined()) frameWatergate(); };
 new ResizeObserver(resize).observe(stage); resize();
 
 // ---------- 소리 (합성, 파일 없음): 판이 자리에 '톡', 빼기 '딱', 덩어리 합침 '쿵', 그 자리 아님 '둑둑', 아직 '똑똑', 완성 실로폰. 끌 수 있음 (기억)
@@ -1654,6 +1654,15 @@ window.addEventListener("keydown", e => {
 
 const fmt = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 function startClock() { started = performance.now(); timer = setInterval(() => $("s-time").textContent = fmt(Math.floor((performance.now() - started) / 1000)), 500); }
+function frameWatergate() {
+  if (KIT?.design !== "watergate") return;
+  const box=new THREE.Box3();
+  for(const s of Object.values(slots))box.union(boxOf(s,offOf(s.module)));
+  const c=box.getCenter(new THREE.Vector3()),vf=THREE.MathUtils.degToRad(camera.fov/2),hf=Math.atan(Math.tan(vf)*camera.aspect);
+  const distance=box.getSize(new THREE.Vector3()).length()/2/Math.sin(Math.min(vf,hf))*1.08;
+  controls.target.copy(c);camera.position.copy(c).addScaledVector(new THREE.Vector3(.72,.45,1).normalize(),distance);
+  camera.near=.1;camera.far=Math.max(camera.far,distance*10);camera.updateProjectionMatrix();controls.update();
+}
 function finish() {
   clearInterval(timer); controls.autoRotate = ROT; controls.autoRotateSpeed = 1.2;
   $("done-stats").innerHTML = demoRun ? `<svg><use href="#i-play"/></svg>` :                  // 자동 조립으로 끝남 = 기록 없음
@@ -1661,14 +1670,14 @@ function finish() {
   if (VKITS.has(kitId)) { BUILT.add(kitId); saveBuilt(); }
   $("b-tomap").hidden = !VKITS.has(kitId);
   $("done").hidden = false; $("live").textContent = "완성";
-  sfx("done"); startMotion();
+  sfx("done"); startMotion(); frameWatergate();
 }
 function reset() {
   $("live").textContent = "";
   stopBridgeCycle(); stopMotion(); clearOuts(); placed.clear(); bridgeState=newBridgeState(); selected = null; stats = { miss: 0, hint: 0 }; clearInterval(timer); started = 0; demoRun = false;
   for (const m of KIT.modules) MOD[m].joined = m === KIT.base;                                // 덩어리는 다시 탁자 위 제자리로
   for (const s of Object.values(slots)) { s.mesh.visible = false; s.ghost.visible = true; }
-  poseAll(); flights.length = 0; controls.autoRotate = false; $("done").hidden = true; $("s-time").textContent = "0:00"; refresh();
+  poseAll(); flights.length = 0; controls.autoRotate = false; $("done").hidden = true; $("s-time").textContent = "0:00"; refresh(); frameWatergate();
 }
 $("b-reset").addEventListener("click", () => { stopDemo(); reset(); }); $("b-tomap").addEventListener("click", () => switchKit("map")); $("b-again").addEventListener("click", () => { stopDemo(); reset(); });
 
