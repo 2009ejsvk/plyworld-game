@@ -182,6 +182,9 @@ body { background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, sans-
   <symbol id="i-map" viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5zM3 8v8l9 5 9-5V8M12 13v8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-inn" viewBox="0 0 24 24"><path d="M3 11l6-6h6l6 6M5 10v10h14V10M9 20v-5h3v5M14 13h3v3h-3M17 5v3M19 15h2v4h-2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-bakery" viewBox="0 0 24 24"><path d="M10 10l5-5 6 6M12 9v11h8V10M15 20v-4h2v4M3 20v-5a4 4 0 0 1 8 0v5zM5.5 20v-3h3v3M2 20h20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-crescent_palace" viewBox="0 0 24 24"><path d="M2 6v15h5V10m10 11h5V6M2 6l3-3 3 3m8 0l3-3 3 3M7 10q5 6 10 0M7 15q5 6 10 0M9 21h6M10 3h4v5h-4z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+  <symbol id="i-octagonal_archive" viewBox="0 0 24 24"><path d="M6 8l6-5 6 5v12H6zM3 8h18M4 21h16M8 11h2m4 0h2m-8 4h2m4 0h2M8 20v-3h8v3M10 3V1h4v2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+  <symbol id="i-grand_opera" viewBox="0 0 24 24"><path d="M2 21h20M4 18h16M5 18V9m4 9V9m6 9V9m4 9V9M2 9l10-6 10 6zM1 5v13h2m20-13v13h-2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
   <symbol id="i-canal_library" viewBox="0 0 24 24"><path d="M2 21h20M3 21V7h18v14M2 7l3-4h14l3 4M6 19v-4a2 2 0 014 0v4m4 0v-4a2 2 0 014 0v4M6 9v3m4-3v3m4-3v3m4-3v3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
   <symbol id="i-terrace_monastery" viewBox="0 0 24 24"><path d="M2 22h20M3 22v-8h6v8m-7-8l4-4 4 4m2 8V8h8v14M10 8l6-5 6 5M13 12h2m2 0h2m-6 4h2m2 0h2M8 22v-3h2v-3h2M4 17h3M14 5V1h3v3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
   <symbol id="i-bridge_guildhall" viewBox="0 0 24 24"><path d="M1 22h22M2 21v-7h20v7M4 21v-3a2 2 0 014 0v3m0 0v-3a2 2 0 014 0v3m0 0v-3a2 2 0 014 0v3m0 0v-3a2 2 0 014 0v3M3 14V7h5v7M2 7l3.5-4L9 7m0 7V5h6v9M8 5l4-4 4 4m0 9V8h5v6m-6-6l3.5-4L22 8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
@@ -250,11 +253,11 @@ body { background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, sans-
   </div>
 </div>
 
-<script src="village_maps.js?v=53-three-maps"></script>
-<script src="village_math.js?v=53-three-maps"></script>
+<script src="village_maps.js?v=54-crown-trio"></script>
+<script src="village_math.js?v=54-crown-trio"></script>
 <script>
 const $ = id => document.getElementById(id);
-const DATA_V = "53-three-maps";                                                    // 키트 자료 판 (바꿔 올릴 때 올림: 브라우저에 남은 옛 자료와 섞이지 않게)
+const DATA_V = "54-crown-trio";                                                    // 키트 자료 판 (바꿔 올릴 때 올림: 브라우저에 남은 옛 자료와 섞이지 않게)
 const cssColor = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 let KIT, slots = {}, placed = new Set(), selected = null, stats = { miss: 0, hint: 0 }, timer = null, started = 0;
 
@@ -289,7 +292,7 @@ function recolor() { scene.background = new THREE.Color(cssColor("--stage")); gh
 recolor();
 const mq = window.matchMedia("(prefers-color-scheme: dark)"); if (mq.addEventListener) mq.addEventListener("change", recolor);
 new MutationObserver(recolor).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-const resize = () => { const w = stage.clientWidth, h = stage.clientHeight; if (!w || !h) return; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); if (["watergate", "canal_library", "terrace_monastery", "bridge_guildhall"].includes(KIT?.design) && !mapOn && !bridgeCycle && !demo && !bridgeState?.busy && placed.size === KIT.plates && allJoined()) frameArchitecturalKit(); };
+const resize = () => { const w = stage.clientWidth, h = stage.clientHeight; if (!w || !h) return; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); if (["watergate", "canal_library", "terrace_monastery", "bridge_guildhall", "crescent_palace", "octagonal_archive", "grand_opera"].includes(KIT?.design) && !mapOn && !bridgeCycle && !demo && !bridgeState?.busy && placed.size === KIT.plates && allJoined()) frameArchitecturalKit(); };
 new ResizeObserver(resize).observe(stage); resize();
 
 // ---------- 소리 (합성, 파일 없음): 판이 자리에 '톡', 빼기 '딱', 덩어리 합침 '쿵', 그 자리 아님 '둑둑', 아직 '똑똑', 완성 실로폰. 끌 수 있음 (기억)
@@ -753,7 +756,7 @@ function stepMotion(now) {
 }
 
 // ---------- 키트 (소품마다 data/<id>/): 고르면 조립대를 비우고 새로 깖
-const KITS = [{ id: "canal_library", name: "운하 대도서관" }, { id: "terrace_monastery", name: "테라스 수도원" }, { id: "bridge_guildhall", name: "아치교 위 목조 길드회관" }, { id: "watergate", name: "기계 수문탑" }, { id: "railway_terminal", name: "대시계 철도역" }, { id: "courtyardpalace", name: "다층 처마 궁궐" }, { id: "botanical_conservatory", name: "유리돔 식물원" }, { id: "buyongpavilion", name: "부용 누각 · A" }, { id: "hyangwonjeong", name: "향원 육각 누각 · B" }, { id: "gwallamjeong", name: "부채정 · 관람정 모티프 · C" }, { id: "citadel", name: "해자 성채" }, { id: "cathedral", name: "대성당" }, { id: "moonpavilion", name: "달빛 누각" }, { id: "moonbridge_layered", name: "달빛 개울다리 · 겹쌓기" }, { id: "moonbridge", name: "달빛 개울다리" }, { id: "windmill", name: "풍차" }, { id: "cart", name: "수레" }, { id: "cottage_kit", name: "오두막" }, { id: "well", name: "우물" },
+const KITS = [{ id: "crescent_palace", name: "초승달 회랑 궁전" }, { id: "octagonal_archive", name: "팔각 왕실 서고" }, { id: "grand_opera", name: "대계단 오페라하우스" }, { id: "canal_library", name: "운하 대도서관" }, { id: "terrace_monastery", name: "테라스 수도원" }, { id: "bridge_guildhall", name: "아치교 위 목조 길드회관" }, { id: "watergate", name: "기계 수문탑" }, { id: "railway_terminal", name: "대시계 철도역" }, { id: "courtyardpalace", name: "다층 처마 궁궐" }, { id: "botanical_conservatory", name: "유리돔 식물원" }, { id: "buyongpavilion", name: "부용 누각 · A" }, { id: "hyangwonjeong", name: "향원 육각 누각 · B" }, { id: "gwallamjeong", name: "부채정 · 관람정 모티프 · C" }, { id: "citadel", name: "해자 성채" }, { id: "cathedral", name: "대성당" }, { id: "moonpavilion", name: "달빛 누각" }, { id: "moonbridge_layered", name: "달빛 개울다리 · 겹쌓기" }, { id: "moonbridge", name: "달빛 개울다리" }, { id: "windmill", name: "풍차" }, { id: "cart", name: "수레" }, { id: "cottage_kit", name: "오두막" }, { id: "well", name: "우물" },
               { id: "mill", name: "방앗간" }, { id: "carousel", name: "회전목마" }, { id: "ferris", name: "관람차" },
               { id: "lighthouse", name: "등대" }, { id: "gate", name: "성문" }, { id: "clocktower", name: "시계탑" }, { id: "crane", name: "크레인" }, { id: "ship", name: "범선" },
               { id: "viking", name: "바이킹" }, { id: "beam", name: "빔 엔진" }, { id: "treehouse", name: "나무 위 집" }, { id: "observatory", name: "천문대" }, { id: "train", name: "기관차" },
@@ -992,7 +995,7 @@ function villageShape(p){
   for(const ring of p.holes){const h=new THREE.Path();ring.forEach(([x,z],i)=>i?h.lineTo(x,-z):h.moveTo(x,-z));h.closePath();sh.holes.push(h);}return sh;
 }
 function villageTerrain(top){
-  const m=VILLAGE,W=m.x1-m.x0,D=m.z1-m.z0,geo=new THREE.PlaneGeometry(W,D,SVG?40:268,SVG?30:202);geo.rotateX(-Math.PI/2);
+  const m=VILLAGE,W=m.x1-m.x0,D=m.z1-m.z0,geo=new THREE.PlaneGeometry(W,D,SVG?40:268,SVG?30:202);geo.rotateX(-Math.PI/2);geo.translate((m.x0+m.x1)/2,0,(m.z0+m.z1)/2);
   const a=geo.attributes.position,colors=[];
   for(let i=0;i<a.count;i++){const x=a.getX(i),z=a.getZ(i),h=villageMath.heightAt(m,x,z);a.setY(i,h);
     const contour=h>3&&Math.abs(h/3-Math.round(h/3))<.10?.93:1;colors.push(contour,contour,contour);
@@ -1060,8 +1063,8 @@ async function buildMap(){
   const SC=Object.fromEntries(await Promise.all([...VKITS].map(id=>glbScene(id).then(sc=>[id,sc],()=>[id,null]))));
   if(ticket!==mapBuildTicket||layout!==VILLAGE||!mapOn)return false;
   mapRoot=new THREE.Group();mapRoot.userData.mapId=layout.id;mapRoot.userData.sharedGeometry=new Set();scene.add(mapRoot);
-  const W=layout.x1-layout.x0,D=layout.z1-layout.z0,board=new THREE.Mesh(new THREE.BoxGeometry(W+6,14,D+6),burnMat);board.position.y=-11;board.receiveShadow=true;mapRoot.add(board);
-  const lip=cut(new THREE.BoxGeometry(W+12,3,D+12),birchMat);lip.position.y=-19.5;mapRoot.add(lip);
+  const W=layout.x1-layout.x0,D=layout.z1-layout.z0,board=new THREE.Mesh(new THREE.BoxGeometry(W+6,14,D+6),burnMat);board.position.set((layout.x0+layout.x1)/2,-11,(layout.z0+layout.z1)/2);board.receiveShadow=true;mapRoot.add(board);
+  const lip=cut(new THREE.BoxGeometry(W+12,3,D+12),birchMat);lip.position.set((layout.x0+layout.x1)/2,-19.5,(layout.z0+layout.z1)/2);mapRoot.add(lip);
   layout.slots.forEach((v,i)=>{
     if(!SC[v.kit])return;const src=SC[v.kit],solid=src.clone(true);let ghost=SVG?null:src.clone(true);
     solid.traverse(o=>{if(o.isMesh){mapRoot.userData.sharedGeometry.add(o.geometry);o.material=o.material.clone();Object.assign(o.material,{side:THREE.DoubleSide,metalness:0,roughness:.82});o.castShadow=o.receiveShadow=true;}});
@@ -1652,7 +1655,7 @@ window.addEventListener("keydown", e => {
 const fmt = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 function startClock() { started = performance.now(); timer = setInterval(() => $("s-time").textContent = fmt(Math.floor((performance.now() - started) / 1000)), 500); }
 function frameArchitecturalKit() {
-  if (!["watergate", "canal_library", "terrace_monastery", "bridge_guildhall"].includes(KIT?.design)) return;
+  if (!["watergate", "canal_library", "terrace_monastery", "bridge_guildhall", "crescent_palace", "octagonal_archive", "grand_opera"].includes(KIT?.design)) return;
   const box=new THREE.Box3();
   for(const s of Object.values(slots))box.union(boxOf(s,offOf(s.module)));
   const c=box.getCenter(new THREE.Vector3()),vf=THREE.MathUtils.degToRad(camera.fov/2),hf=Math.atan(Math.tan(vf)*camera.aspect);
