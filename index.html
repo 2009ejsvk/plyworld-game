@@ -191,6 +191,9 @@ body { background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, sans-
   <symbol id="i-canal_library" viewBox="0 0 24 24"><path d="M2 21h20M3 21V7h18v14M2 7l3-4h14l3 4M6 19v-4a2 2 0 014 0v4m4 0v-4a2 2 0 014 0v4M6 9v3m4-3v3m4-3v3m4-3v3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
   <symbol id="i-terrace_monastery" viewBox="0 0 24 24"><path d="M2 22h20M3 22v-8h6v8m-7-8l4-4 4 4m2 8V8h8v14M10 8l6-5 6 5M13 12h2m2 0h2m-6 4h2m2 0h2M8 22v-3h2v-3h2M4 17h3M14 5V1h3v3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
   <symbol id="i-bridge_guildhall" viewBox="0 0 24 24"><path d="M1 22h22M2 21v-7h20v7M4 21v-3a2 2 0 014 0v3m0 0v-3a2 2 0 014 0v3m0 0v-3a2 2 0 014 0v3m0 0v-3a2 2 0 014 0v3M3 14V7h5v7M2 7l3.5-4L9 7m0 7V5h6v9M8 5l4-4 4 4m0 9V8h5v6m-6-6l3.5-4L22 8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+  <symbol id="i-canal_warehouse" viewBox="0 0 24 24"><path d="M2 22h20M4 22V8h3V5h3V2h4v3h3v3h3v14M8 22v-7h8v7M8 10h2v2H8m6-2h2v2h-2M12 5v3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+  <symbol id="i-highland_caravan_inn" viewBox="0 0 24 24"><path d="M2 22h20M3 22V11h7V4h10v18M3 11V8h7M10 4V2h10v2M13 8h4m-4 4h4m-4 4h4M6 22v-6h4m0 0v6M2 14h8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+  <symbol id="i-seedpod_workshop" viewBox="0 0 24 24"><path d="M3 22h18M6 22v-4m12 4v-4M4 15C3 9 7 5 12 2c5 3 9 7 8 13l-2 3H6zM12 2L8 11l1 7m3-16 4 9-1 7M9 18v-5h6v5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
   <symbol id="i-watergate" viewBox="0 0 24 24"><path d="M2 22h20M3 22V7h5v15m8 0V7h5v15M1 7l4.5-5L10 7m4 0 4.5-5L23 7M8 10h8M9 21V12h6v9m-4-8v8m2-8v8M8 5h8M10 5V2h4v3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
   <symbol id="i-citadel" viewBox="0 0 24 24"><path d="M3 21V6h3V3h3v3h6V3h3v3h3v15H3M3 10h18M9 21v-6a3 3 0 0 1 6 0v6M9 10V8h6v2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
   <symbol id="i-cathedral" viewBox="0 0 24 24"><path d="M3 21V10l6-5 6 5v11M6 21v-7h6v7M15 21V7h6v14M15 7l3-6 3 6M18 10v3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9" cy="10" r="2" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
@@ -217,7 +220,7 @@ body { background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, sans-
 <div class="app">
   <div class="sheet" id="sheet" role="toolbar" aria-label="부품 원판"></div>
   <div class="stage" id="stage">
-    <nav class="village-switch" id="village-switch" aria-label="마을 풍경 선택" hidden><div class="choices"><button type="button" data-village="market" aria-pressed="false">① 장터 마을</button><button type="button" data-village="water" aria-pressed="false">② 물길 마을</button><button type="button" data-village="woodland" aria-pressed="false">③ 숲·언덕 마을</button></div><p id="village-desc"></p></nav>
+    <nav class="village-switch" id="village-switch" aria-label="마을 풍경 선택" hidden><div class="choices"><button type="button" data-village="market" aria-pressed="false">① 장터·고원</button><button type="button" data-village="water" aria-pressed="false">② 물길 마을</button><button type="button" data-village="woodland" aria-pressed="false">③ 숲·언덕 마을</button></div><p id="village-desc"></p></nav>
     <div class="bar" aria-hidden="true"><i id="bar"></i></div>
     <div class="hud">
       <div class="kits" id="kits" role="group" aria-label="키트"></div>
@@ -256,11 +259,11 @@ body { background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, sans-
   </div>
 </div>
 
-<script src="village_maps.js?v=57-fantasy-trio"></script>
-<script src="village_math.js?v=57-fantasy-trio"></script>
+<script src="village_maps.js?v=58-world-buildings"></script>
+<script src="village_math.js?v=58-world-buildings"></script>
 <script>
 const $ = id => document.getElementById(id);
-const DATA_V = "57-fantasy-trio";                                                    // 키트 자료 판 (바꿔 올릴 때 올림: 브라우저에 남은 옛 자료와 섞이지 않게)
+const DATA_V = "58-world-buildings";                                                    // 키트 자료 판 (바꿔 올릴 때 올림: 브라우저에 남은 옛 자료와 섞이지 않게)
 const cssColor = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 let KIT, slots = {}, placed = new Set(), selected = null, stats = { miss: 0, hint: 0 }, timer = null, started = 0;
 
@@ -295,7 +298,7 @@ function recolor() { scene.background = new THREE.Color(cssColor("--stage")); gh
 recolor();
 const mq = window.matchMedia("(prefers-color-scheme: dark)"); if (mq.addEventListener) mq.addEventListener("change", recolor);
 new MutationObserver(recolor).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-const resize = () => { const w = stage.clientWidth, h = stage.clientHeight; if (!w || !h) return; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); if (["watergate", "canal_library", "terrace_monastery", "bridge_guildhall", "crescent_palace", "octagonal_archive", "grand_opera", "moon_academy", "worldtree_sanctuary", "dragon_gate"].includes(KIT?.design) && !mapOn && !bridgeCycle && !demo && !bridgeState?.busy && placed.size === KIT.plates && allJoined()) frameArchitecturalKit(); };
+const resize = () => { const w = stage.clientWidth, h = stage.clientHeight; if (!w || !h) return; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); if (["watergate", "canal_library", "terrace_monastery", "bridge_guildhall", "crescent_palace", "octagonal_archive", "grand_opera", "moon_academy", "worldtree_sanctuary", "dragon_gate", "canal_warehouse", "highland_caravan_inn", "seedpod_workshop"].includes(KIT?.design) && !mapOn && !bridgeCycle && !demo && !bridgeState?.busy && placed.size === KIT.plates && allJoined()) frameArchitecturalKit(); };
 new ResizeObserver(resize).observe(stage); resize();
 
 // ---------- 소리 (합성, 파일 없음): 판이 자리에 '톡', 빼기 '딱', 덩어리 합침 '쿵', 그 자리 아님 '둑둑', 아직 '똑똑', 완성 실로폰. 끌 수 있음 (기억)
@@ -759,7 +762,7 @@ function stepMotion(now) {
 }
 
 // ---------- 키트 (소품마다 data/<id>/): 고르면 조립대를 비우고 새로 깖
-const KITS = [{ id: "moon_academy", name: "월륜 마법학원" }, { id: "worldtree_sanctuary", name: "세계수 성소" }, { id: "dragon_gate", name: "비룡 관문성" }, { id: "crescent_palace", name: "초승달 회랑 궁전" }, { id: "octagonal_archive", name: "팔각 왕실 서고" }, { id: "grand_opera", name: "대계단 오페라하우스" }, { id: "canal_library", name: "운하 대도서관" }, { id: "terrace_monastery", name: "테라스 수도원" }, { id: "bridge_guildhall", name: "아치교 위 목조 길드회관" }, { id: "watergate", name: "기계 수문탑" }, { id: "railway_terminal", name: "대시계 철도역" }, { id: "courtyardpalace", name: "다층 처마 궁궐" }, { id: "botanical_conservatory", name: "유리돔 식물원" }, { id: "buyongpavilion", name: "부용 누각 · A" }, { id: "hyangwonjeong", name: "향원 육각 누각 · B" }, { id: "gwallamjeong", name: "부채정 · 관람정 모티프 · C" }, { id: "citadel", name: "해자 성채" }, { id: "cathedral", name: "대성당" }, { id: "moonpavilion", name: "달빛 누각" }, { id: "moonbridge_layered", name: "달빛 개울다리 · 겹쌓기" }, { id: "moonbridge", name: "달빛 개울다리" }, { id: "windmill", name: "풍차" }, { id: "cart", name: "수레" }, { id: "cottage_kit", name: "오두막" }, { id: "well", name: "우물" },
+const KITS = [{ id: "canal_warehouse", name: "수로 하역 창고" }, { id: "highland_caravan_inn", name: "고원 대상 여관" }, { id: "seedpod_workshop", name: "씨앗형 숲 공방" }, { id: "moon_academy", name: "월륜 마법학원" }, { id: "worldtree_sanctuary", name: "세계수 성소" }, { id: "dragon_gate", name: "비룡 관문성" }, { id: "crescent_palace", name: "초승달 회랑 궁전" }, { id: "octagonal_archive", name: "팔각 왕실 서고" }, { id: "grand_opera", name: "대계단 오페라하우스" }, { id: "canal_library", name: "운하 대도서관" }, { id: "terrace_monastery", name: "테라스 수도원" }, { id: "bridge_guildhall", name: "아치교 위 목조 길드회관" }, { id: "watergate", name: "기계 수문탑" }, { id: "railway_terminal", name: "대시계 철도역" }, { id: "courtyardpalace", name: "다층 처마 궁궐" }, { id: "botanical_conservatory", name: "유리돔 식물원" }, { id: "buyongpavilion", name: "부용 누각 · A" }, { id: "hyangwonjeong", name: "향원 육각 누각 · B" }, { id: "gwallamjeong", name: "부채정 · 관람정 모티프 · C" }, { id: "citadel", name: "해자 성채" }, { id: "cathedral", name: "대성당" }, { id: "moonpavilion", name: "달빛 누각" }, { id: "moonbridge_layered", name: "달빛 개울다리 · 겹쌓기" }, { id: "moonbridge", name: "달빛 개울다리" }, { id: "windmill", name: "풍차" }, { id: "cart", name: "수레" }, { id: "cottage_kit", name: "오두막" }, { id: "well", name: "우물" },
               { id: "mill", name: "방앗간" }, { id: "carousel", name: "회전목마" }, { id: "ferris", name: "관람차" },
               { id: "lighthouse", name: "등대" }, { id: "gate", name: "성문" }, { id: "clocktower", name: "시계탑" }, { id: "crane", name: "크레인" }, { id: "ship", name: "범선" },
               { id: "viking", name: "바이킹" }, { id: "beam", name: "빔 엔진" }, { id: "treehouse", name: "나무 위 집" }, { id: "observatory", name: "천문대" }, { id: "train", name: "기관차" },
@@ -1090,7 +1093,8 @@ function showVillage() {                                              // 지은 
     const on = BUILT.has(v.kit); v.solid.visible = on; v.ghost.visible = !on;
     v.solid.traverse(o => { if (o.userData.home) o.position.copy(o.userData.home); if (o !== v.solid) o.visible = true; });
   }
-  $("live").textContent = `마을 ${[...VKITS].filter(k => BUILT.has(k)).length}/${VKITS.size}`;
+  const currentKits=new Set(VILLAGE.slots.map(v=>v.kit));
+  $("live").textContent = `마을 ${[...currentKits].filter(k => BUILT.has(k)).length}/${currentKits.size}`;
 }
 const SUN0 = { pos: sun.position.clone(), cam: { ...sun.shadow.camera } };
 function mapSun(on) {                                                 // 마을: 해 그림자가 넓은 판 전체를 덮게 (키트 조립대에서는 원래대로)
@@ -1658,7 +1662,7 @@ window.addEventListener("keydown", e => {
 const fmt = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 function startClock() { started = performance.now(); timer = setInterval(() => $("s-time").textContent = fmt(Math.floor((performance.now() - started) / 1000)), 500); }
 function frameArchitecturalKit() {
-  if (!["watergate", "canal_library", "terrace_monastery", "bridge_guildhall", "crescent_palace", "octagonal_archive", "grand_opera", "moon_academy", "worldtree_sanctuary", "dragon_gate"].includes(KIT?.design)) return;
+  if (!["watergate", "canal_library", "terrace_monastery", "bridge_guildhall", "crescent_palace", "octagonal_archive", "grand_opera", "moon_academy", "worldtree_sanctuary", "dragon_gate", "canal_warehouse", "highland_caravan_inn", "seedpod_workshop"].includes(KIT?.design)) return;
   const box=new THREE.Box3();
   for(const s of Object.values(slots))box.union(boxOf(s,offOf(s.module)));
   const c=box.getCenter(new THREE.Vector3()),vf=THREE.MathUtils.degToRad(camera.fov/2),hf=Math.atan(Math.tan(vf)*camera.aspect);
