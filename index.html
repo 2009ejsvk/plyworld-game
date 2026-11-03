@@ -159,6 +159,7 @@ body { background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, sans-
   <symbol id="i-map" viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5zM3 8v8l9 5 9-5V8M12 13v8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-inn" viewBox="0 0 24 24"><path d="M3 11l6-6h6l6 6M5 10v10h14V10M9 20v-5h3v5M14 13h3v3h-3M17 5v3M19 15h2v4h-2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-bakery" viewBox="0 0 24 24"><path d="M10 10l5-5 6 6M12 9v11h8V10M15 20v-4h2v4M3 20v-5a4 4 0 0 1 8 0v5zM5.5 20v-3h3v3M2 20h20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-citadel" viewBox="0 0 24 24"><path d="M3 21V6h3V3h3v3h6V3h3v3h3v15H3M3 10h18M9 21v-6a3 3 0 0 1 6 0v6M9 10V8h6v2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
   <symbol id="i-cathedral" viewBox="0 0 24 24"><path d="M3 21V10l6-5 6 5v11M6 21v-7h6v7M15 21V7h6v14M15 7l3-6 3 6M18 10v3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9" cy="10" r="2" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
 <symbol id="i-chapel" viewBox="0 0 24 24"><path d="M4 13l8-6 8 6M6 12v9h12v-9M10 21v-4a2 2 0 0 1 4 0v4M12 7V2.5M10.5 4h3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-townhouse" viewBox="0 0 24 24"><path d="M6 21V9h2V6h2V3h4v3h2v3h2v12zM10 21v-4h4v4M9.5 11h1.5v2H9.5M13 11h1.5v2H13" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
@@ -220,7 +221,7 @@ body { background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, sans-
 
 <script>
 const $ = id => document.getElementById(id);
-const DATA_V = "39";                                                    // 키트 자료 판 (바꿔 올릴 때 올림: 브라우저에 남은 옛 자료와 섞이지 않게)
+const DATA_V = "40";                                                    // 키트 자료 판 (바꿔 올릴 때 올림: 브라우저에 남은 옛 자료와 섞이지 않게)
 const cssColor = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 let KIT, slots = {}, placed = new Set(), selected = null, stats = { miss: 0, hint: 0 }, timer = null, started = 0;
 
@@ -556,7 +557,7 @@ function stepMotion(now) {
 }
 
 // ---------- 키트 (소품마다 data/<id>/): 고르면 조립대를 비우고 새로 깖
-const KITS = [{ id: "cathedral", name: "대성당" }, { id: "moonpavilion", name: "달빛 누각" }, { id: "moonbridge_layered", name: "달빛 개울다리 · 겹쌓기" }, { id: "moonbridge", name: "달빛 개울다리" }, { id: "windmill", name: "풍차" }, { id: "cart", name: "수레" }, { id: "cottage_kit", name: "오두막" }, { id: "well", name: "우물" },
+const KITS = [{ id: "citadel", name: "해자 성채" }, { id: "cathedral", name: "대성당" }, { id: "moonpavilion", name: "달빛 누각" }, { id: "moonbridge_layered", name: "달빛 개울다리 · 겹쌓기" }, { id: "moonbridge", name: "달빛 개울다리" }, { id: "windmill", name: "풍차" }, { id: "cart", name: "수레" }, { id: "cottage_kit", name: "오두막" }, { id: "well", name: "우물" },
               { id: "mill", name: "방앗간" }, { id: "carousel", name: "회전목마" }, { id: "ferris", name: "관람차" },
               { id: "lighthouse", name: "등대" }, { id: "gate", name: "성문" }, { id: "clocktower", name: "시계탑" }, { id: "crane", name: "크레인" }, { id: "ship", name: "범선" },
               { id: "viking", name: "바이킹" }, { id: "beam", name: "빔 엔진" }, { id: "treehouse", name: "나무 위 집" }, { id: "observatory", name: "천문대" }, { id: "train", name: "기관차" },
@@ -571,6 +572,7 @@ const rnd = seed => () => { seed = (seed * 16807) % 2147483647; return (seed - 1
 const VILLAGE = { x0: -410, x1: 990, z0: -570, z1: 410, square: 250, slots: [                   // 자리 (mm, glTF: x = 화면 오른쪽 앞, z = 왼쪽 앞) + 앞 (glTF +Z) 방향 (0 +Z, 1 +X, 2 -Z, 3 -X)
   // 대성당 북쪽 뜰: 주거 구역 뒤, 정문은 남쪽 연결 길을 봄
   { kit: "cathedral", x: 540, z: -450, rot: 0 },
+  { kit: "citadel", x: 820, z: -450, rot: 0 },
   // 장터 광장 (refs/map_market/map.png 배치)
   { kit: "market_tower", x: -125, z: -125, rot: 0 }, { kit: "chapel", x: 15, z: -178, rot: 0 }, { kit: "smithy", x: 135, z: -150, rot: 0 },
   { kit: "bakery", x: -190, z: 10, rot: 1 }, { kit: "inn", x: -150, z: 160, rot: 1 }, { kit: "townhouse", x: 160, z: 55, rot: 0 },
@@ -578,7 +580,7 @@ const VILLAGE = { x0: -410, x1: 990, z0: -570, z1: 410, square: 250, slots: [   
   // 바깥 둘레: 마을 문 (앞 담), 회관 (뒤), 헛간·벽돌 집 (오른쪽), 목조 집 (앞 골목), 언덕 풍차 (왼쪽 둘레, 시계탑에 가리지 않게)
   { kit: "gatehouse", x: 110, z: 380, rot: 0 }, { kit: "market_hall", x: 40, z: -332, rot: 0 }, { kit: "barn", x: 330, z: -300, rot: 0 },
   { kit: "house_a", x: 322, z: 58, rot: 0 }, { kit: "house_b", x: -150, z: 330, rot: 0 }, { kit: "tower_mill", x: -340, z: -175, rot: 0 }],
-  roads: [[22, [[540, -377], [540, -310], [700, -310]]], [40, [[250, -150], [1000, -150]]], [40, [[322, 150], [1000, 150]]], [24, [[700, -420], [700, 420]]],   // 대성당 기단 앞에서 만나는 길 + 주거 구역 큰길 둘
+  roads: [[22, [[820, -360], [820, -310], [700, -310]]], [22, [[540, -377], [540, -310], [700, -310]]], [40, [[250, -150], [1000, -150]]], [40, [[322, 150], [1000, 150]]], [24, [[700, -420], [700, 420]]],   // 대성당 기단 앞에서 만나는 길 + 주거 구역 큰길 둘
           [36, [[110, 420], [110, 240]]], [22, [[-150, 368], [-150, 390], [92, 390]]], [24, [[40, -300], [40, -240]]],
           [22, [[330, -252], [330, -212], [240, -212]]], [22, [[322, 92], [322, 150], [240, 150]]], [16, [[-340, -140], [-300, -95], [-245, -95]]]],
   pond: [-320, 140, 46],
@@ -601,6 +603,7 @@ const VILLAGE = { x0: -410, x1: 990, z0: -570, z1: 410, square: 250, slots: [   
   for (const x of [700]) for (const z of [-30, 30]) VILLAGE.nature.push(["bush", x + 30, z, 0.8]); }
 // 대성당 기단과 정문 진입로 주변은 나무 수관까지 비운 뜰로 둔다.
 VILLAGE.nature = VILLAGE.nature.filter(([, x, z]) => !(x > 485 && x < 595 && z > -540 && z < -340));
+VILLAGE.nature = VILLAGE.nature.filter(([, x, z]) => !(x > 720 && x < 930 && z > -555 && z < -325));
 const VKITS = new Set(VILLAGE.slots.map(v => v.kit));
 const BUILT = new Set(); try { JSON.parse(localStorage.getItem("built") || "[]").forEach(k => BUILT.add(k)); } catch (e) {}
 const saveBuilt = () => { try { localStorage.setItem("built", JSON.stringify([...BUILT])); } catch (e) {} };
