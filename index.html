@@ -282,7 +282,7 @@ body { background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, sans-
 <script src="progression_village.js?v=74-gallery-level-eleven"></script>
 <script>
 const $ = id => document.getElementById(id);
-const DATA_V = "76-world-rebuild";                                                    // 키트 자료 판 (바꿔 올릴 때 올림: 브라우저에 남은 옛 자료와 섞이지 않게)
+const DATA_V = "77-paper-theatre";                                                    // 키트 자료 판 (바꿔 올릴 때 올림: 브라우저에 남은 옛 자료와 섞이지 않게)
 const cssColor = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 let KIT, slots = {}, placed = new Set(), selected = null, stats = { miss: 0, hint: 0 }, timer = null, started = 0;
 
@@ -317,7 +317,7 @@ function recolor() { scene.background = new THREE.Color(cssColor("--stage")); gh
 recolor();
 const mq = window.matchMedia("(prefers-color-scheme: dark)"); if (mq.addEventListener) mq.addEventListener("change", recolor);
 new MutationObserver(recolor).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-const resize = () => { const w = stage.clientWidth, h = stage.clientHeight; if (!w || !h) return; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); if (["watergate", "canal_library", "terrace_monastery", "bridge_guildhall", "crescent_palace", "octagonal_archive", "grand_opera", "moon_academy", "worldtree_sanctuary", "dragon_gate", "canal_warehouse", "highland_caravan_inn", "seedpod_workshop", "starter_cottage", "starter_watchpost", "starter_bakery", "garden_lodge", "hearth_cottage", "carpenter_workshop", "apothecary_house", "astral_academy", "sky_court_palace", "guild_office", "arched_customs_house", "courtyard_inn", "great_civic_basilica", "octagonal_bathhouse", "imperial_court", "twin_tower_college", "royal_amphitheatre", "canal_art_gallery"].includes(KIT?.design) && !mapOn && !bridgeCycle && !demo && !bridgeState?.busy && placed.size === KIT.plates && allJoined()) frameArchitecturalKit(); };
+const resize = () => { const w = stage.clientWidth, h = stage.clientHeight; if (!w || !h) return; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); if ((KIT?.design.startsWith("theatre_") || ["watergate", "canal_library", "terrace_monastery", "bridge_guildhall", "crescent_palace", "octagonal_archive", "grand_opera", "moon_academy", "worldtree_sanctuary", "dragon_gate", "canal_warehouse", "highland_caravan_inn", "seedpod_workshop", "starter_cottage", "starter_watchpost", "starter_bakery", "garden_lodge", "hearth_cottage", "carpenter_workshop", "apothecary_house", "astral_academy", "sky_court_palace", "guild_office", "arched_customs_house", "courtyard_inn", "great_civic_basilica", "octagonal_bathhouse", "imperial_court", "twin_tower_college", "royal_amphitheatre", "canal_art_gallery"].includes(KIT?.design)) && !mapOn && !bridgeCycle && !demo && !bridgeState?.busy && placed.size === KIT.plates && allJoined()) frameArchitecturalKit(); };
 new ResizeObserver(resize).observe(stage); resize();
 
 // ---------- 소리 (합성, 파일 없음): 판이 자리에 '톡', 빼기 '딱', 덩어리 합침 '쿵', 그 자리 아님 '둑둑', 아직 '똑똑', 완성 실로폰. 끌 수 있음 (기억)
@@ -781,7 +781,18 @@ function stepMotion(now) {
 }
 
 // ---------- 키트 (소품마다 data/<id>/): 고르면 조립대를 비우고 새로 깖
-const KITS = [{ id: "royal_amphitheatre", name: "왕립 반원 대극장 · 1171판" }, { id: "imperial_court", name: "황실 목조 회랑궁 · 1021판" }, { id: "great_civic_basilica", name: "대시민 바실리카 · 755판" }, { id: "sky_court_palace", name: "천궁 쌍중정 · 532판" }, { id: "astral_academy", name: "성환 왕립학원 · 497판" }, { id: "starter_cottage", name: "레벨 1 · 숲속 오두막 · 12판" }, { id: "starter_watchpost", name: "레벨 1 · 작은 경비초소 · 12판" }, { id: "starter_bakery", name: "레벨 1 · 마을 빵집 · 12판" }, { id: "garden_lodge", name: "레벨 2 · 정원 관리소 · 18판" }, { id: "hearth_cottage", name: "레벨 3 · 벽난로 오두막 · 24판" }, { id: "carpenter_workshop", name: "레벨 4 · 목수 공방 · 33판" }, { id: "apothecary_house", name: "레벨 5 · 2층 약제상 · 42판" }, { id: "guild_office", name: "레벨 6 · 첨탑 길드 사무소 · 58판" }, { id: "arched_customs_house", name: "레벨 7 · 아치교 세관 · 71판" }, { id: "courtyard_inn", name: "레벨 8 · 중정 여관 · 113판" }, { id: "octagonal_bathhouse", name: "레벨 9 · 팔각 온천관 · 150판" }, { id: "twin_tower_college", name: "레벨 10 · 쌍탑 음악원 · 292판" }, { id: "canal_art_gallery", name: "레벨 11 · 대운하 미술관 · 351판" }, { id: "canal_warehouse", name: "수로 하역 창고" }, { id: "highland_caravan_inn", name: "고원 대상 여관" }, { id: "seedpod_workshop", name: "씨앗형 숲 공방" }, { id: "moon_academy", name: "월륜 마법학원" }, { id: "worldtree_sanctuary", name: "세계수 성소" }, { id: "dragon_gate", name: "비룡 관문성" }, { id: "crescent_palace", name: "초승달 회랑 궁전" }, { id: "octagonal_archive", name: "팔각 왕실 서고" }, { id: "grand_opera", name: "대계단 오페라하우스" }, { id: "canal_library", name: "운하 대도서관" }, { id: "terrace_monastery", name: "테라스 수도원" }, { id: "bridge_guildhall", name: "아치교 위 목조 길드회관" }, { id: "watergate", name: "기계 수문탑" }, { id: "railway_terminal", name: "대시계 철도역" }, { id: "courtyardpalace", name: "다층 처마 궁궐" }, { id: "botanical_conservatory", name: "유리돔 식물원" }, { id: "buyongpavilion", name: "부용 누각 · A" }, { id: "hyangwonjeong", name: "향원 육각 누각 · B" }, { id: "gwallamjeong", name: "부채정 · 관람정 모티프 · C" }, { id: "citadel", name: "해자 성채" }, { id: "cathedral", name: "대성당" }, { id: "moonpavilion", name: "달빛 누각" }, { id: "moonbridge_layered", name: "달빛 개울다리 · 겹쌓기" }, { id: "moonbridge", name: "달빛 개울다리" }, { id: "windmill", name: "풍차" }, { id: "cart", name: "수레" }, { id: "cottage_kit", name: "오두막" }, { id: "well", name: "우물" },
+const KITS = [
+  {"id": "theatre_rabbit", "name": "종이극장 · 달맞이 토끼 · 4판", "theatre": "01"},
+  {"id": "theatre_cat", "name": "종이극장 · 창가의 고양이 · 4판", "theatre": "02"},
+  {"id": "theatre_whale", "name": "종이극장 · 파도 위 고래 · 4판", "theatre": "03"},
+  {"id": "theatre_deer", "name": "종이극장 · 자작나무 숲의 사슴 · 4판", "theatre": "04"},
+  {"id": "theatre_owl", "name": "종이극장 · 별을 읽는 부엉이 · 4판", "theatre": "05"},
+  {"id": "theatre_hedgehog", "name": "종이극장 · 버섯 숲 고슴도치 · 4판", "theatre": "06"},
+  {"id": "theatre_squirrel", "name": "종이극장 · 도토리 찾는 다람쥐 · 4판", "theatre": "07"},
+  {"id": "theatre_bear", "name": "종이극장 · 꽃밭에서 쉬는 곰 · 4판", "theatre": "08"},
+  {"id": "theatre_penguin", "name": "종이극장 · 눈꽃 속 펭귄 · 4판", "theatre": "09"},
+  {"id": "theatre_sailboat", "name": "종이극장 · 등대 앞 작은 범선 · 4판", "theatre": "10"},
+  { id: "royal_amphitheatre", name: "왕립 반원 대극장 · 1171판" }, { id: "imperial_court", name: "황실 목조 회랑궁 · 1021판" }, { id: "great_civic_basilica", name: "대시민 바실리카 · 755판" }, { id: "sky_court_palace", name: "천궁 쌍중정 · 532판" }, { id: "astral_academy", name: "성환 왕립학원 · 497판" }, { id: "starter_cottage", name: "레벨 1 · 숲속 오두막 · 12판" }, { id: "starter_watchpost", name: "레벨 1 · 작은 경비초소 · 12판" }, { id: "starter_bakery", name: "레벨 1 · 마을 빵집 · 12판" }, { id: "garden_lodge", name: "레벨 2 · 정원 관리소 · 18판" }, { id: "hearth_cottage", name: "레벨 3 · 벽난로 오두막 · 24판" }, { id: "carpenter_workshop", name: "레벨 4 · 목수 공방 · 33판" }, { id: "apothecary_house", name: "레벨 5 · 2층 약제상 · 42판" }, { id: "guild_office", name: "레벨 6 · 첨탑 길드 사무소 · 58판" }, { id: "arched_customs_house", name: "레벨 7 · 아치교 세관 · 71판" }, { id: "courtyard_inn", name: "레벨 8 · 중정 여관 · 113판" }, { id: "octagonal_bathhouse", name: "레벨 9 · 팔각 온천관 · 150판" }, { id: "twin_tower_college", name: "레벨 10 · 쌍탑 음악원 · 292판" }, { id: "canal_art_gallery", name: "레벨 11 · 대운하 미술관 · 351판" }, { id: "canal_warehouse", name: "수로 하역 창고" }, { id: "highland_caravan_inn", name: "고원 대상 여관" }, { id: "seedpod_workshop", name: "씨앗형 숲 공방" }, { id: "moon_academy", name: "월륜 마법학원" }, { id: "worldtree_sanctuary", name: "세계수 성소" }, { id: "dragon_gate", name: "비룡 관문성" }, { id: "crescent_palace", name: "초승달 회랑 궁전" }, { id: "octagonal_archive", name: "팔각 왕실 서고" }, { id: "grand_opera", name: "대계단 오페라하우스" }, { id: "canal_library", name: "운하 대도서관" }, { id: "terrace_monastery", name: "테라스 수도원" }, { id: "bridge_guildhall", name: "아치교 위 목조 길드회관" }, { id: "watergate", name: "기계 수문탑" }, { id: "railway_terminal", name: "대시계 철도역" }, { id: "courtyardpalace", name: "다층 처마 궁궐" }, { id: "botanical_conservatory", name: "유리돔 식물원" }, { id: "buyongpavilion", name: "부용 누각 · A" }, { id: "hyangwonjeong", name: "향원 육각 누각 · B" }, { id: "gwallamjeong", name: "부채정 · 관람정 모티프 · C" }, { id: "citadel", name: "해자 성채" }, { id: "cathedral", name: "대성당" }, { id: "moonpavilion", name: "달빛 누각" }, { id: "moonbridge_layered", name: "달빛 개울다리 · 겹쌓기" }, { id: "moonbridge", name: "달빛 개울다리" }, { id: "windmill", name: "풍차" }, { id: "cart", name: "수레" }, { id: "cottage_kit", name: "오두막" }, { id: "well", name: "우물" },
               { id: "mill", name: "방앗간" }, { id: "carousel", name: "회전목마" }, { id: "ferris", name: "관람차" },
               { id: "lighthouse", name: "등대" }, { id: "gate", name: "성문" }, { id: "clocktower", name: "시계탑" }, { id: "crane", name: "크레인" }, { id: "ship", name: "범선" },
               { id: "viking", name: "바이킹" }, { id: "beam", name: "빔 엔진" }, { id: "treehouse", name: "나무 위 집" }, { id: "observatory", name: "천문대" }, { id: "train", name: "기관차" },
@@ -1241,7 +1252,7 @@ async function switchKit(id) {
   try { localStorage.setItem("kit", id); } catch (e) {}
   await loadKit(id); $("load").hidden = true; buildSheet(); reset();
 }
-$("kits").innerHTML = `<button type="button" class="icon mapk" data-kit="map" title="마을" aria-label="마을" aria-pressed="false"><svg><use href="#i-map"/></svg></button>` + KITS.map(k => `<button type="button" class="icon" data-kit="${k.id}" title="${k.name}" aria-label="${k.name}" aria-pressed="false"><svg><use href="#i-${k.id}"/></svg></button>`).join("");
+$("kits").innerHTML = `<button type="button" class="icon mapk" data-kit="map" title="마을" aria-label="마을" aria-pressed="false"><svg><use href="#i-map"/></svg></button>` + KITS.map(k => `<button type="button" class="icon" data-kit="${k.id}" title="${k.name}" aria-label="${k.name}" aria-pressed="false">${k.theatre ? '<span class="spd">'+k.theatre+'</span>' : '<svg><use href="#i-'+k.id+'"/></svg>'}</button>`).join("");
 $("kits").querySelectorAll(".icon").forEach(b => b.addEventListener("click", () => switchKit(b.dataset.kit)));
 
 async function loadKit(id) {
@@ -1418,12 +1429,19 @@ function manualPart(p, n, scale) {
   return `<span class="m-part${p.kind === "pet" ? " pet" : ""}${stock ? " stock" : ""}"${stock ? ` title="${stockEscape(stock)}"` : ""}>${partSVG(p, scale)}${n > 1 ? `<span class="n">×${n}</span>` : ""}${stockTag(p)}</span>`;
 }
 // End mixed-stock presentation.
+let artworkClipId = 0;
 function partSVG(p, scale) {
   const [ext, ...holes] = p.outline, xs = ext.map(q => q[0]), ys = ext.map(q => q[1]);
   const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
   const s = Math.max(scale, 30 / Math.max(x1 - x0, y1 - y0)), w = (x1 - x0) * s, h = (y1 - y0) * s;
   const ring = pts => "M" + pts.map(([x, y]) => `${((x - x0) * s).toFixed(1)},${((y1 - y) * s).toFixed(1)}`).join("L") + "Z";
-  return `<svg width="${w.toFixed(0)}" height="${h.toFixed(0)}" viewBox="0 0 ${w.toFixed(1)} ${h.toFixed(1)}" aria-hidden="true"><path class="fill" d="${[ext, ...holes].map(ring).join("")}" fill-rule="evenodd"/></svg>`;
+  const outline = [ext, ...holes].map(ring).join("");
+  let artwork = "";
+  if (p.artwork) {
+    const id = `print-clip-${artworkClipId++}`, [a, b, c, d] = p.artwork.bounds;
+    artwork = `<defs><clipPath id="${id}"><path d="${outline}" clip-rule="evenodd"/></clipPath></defs><image href="${p.artwork.url}" x="${(a-x0)*s}" y="${(y1-d)*s}" width="${(c-a)*s}" height="${(d-b)*s}" preserveAspectRatio="none" clip-path="url(#${id})"/>`;
+  }
+  return `<svg width="${w.toFixed(0)}" height="${h.toFixed(0)}" viewBox="0 0 ${w.toFixed(1)} ${h.toFixed(1)}" aria-hidden="true"><path class="fill" d="${outline}" fill-rule="evenodd"/>${artwork}</svg>`;
 }
 const left = shape => KIT.groups[shape].filter(id => !placed.has(id)).length;
 function buildSheet() {
@@ -1682,12 +1700,13 @@ window.addEventListener("keydown", e => {
 const fmt = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 function startClock() { started = performance.now(); timer = setInterval(() => $("s-time").textContent = fmt(Math.floor((performance.now() - started) / 1000)), 500); }
 function frameArchitecturalKit() {
-  if (!["watergate", "canal_library", "terrace_monastery", "bridge_guildhall", "crescent_palace", "octagonal_archive", "grand_opera", "moon_academy", "worldtree_sanctuary", "dragon_gate", "canal_warehouse", "highland_caravan_inn", "seedpod_workshop", "starter_cottage", "starter_watchpost", "starter_bakery", "garden_lodge", "hearth_cottage", "carpenter_workshop", "apothecary_house", "astral_academy", "sky_court_palace", "guild_office", "arched_customs_house", "courtyard_inn", "great_civic_basilica", "octagonal_bathhouse", "imperial_court", "twin_tower_college", "royal_amphitheatre", "canal_art_gallery"].includes(KIT?.design)) return;
+  const theatre = KIT?.design.startsWith("theatre_");
+  if (!theatre && !["watergate", "canal_library", "terrace_monastery", "bridge_guildhall", "crescent_palace", "octagonal_archive", "grand_opera", "moon_academy", "worldtree_sanctuary", "dragon_gate", "canal_warehouse", "highland_caravan_inn", "seedpod_workshop", "starter_cottage", "starter_watchpost", "starter_bakery", "garden_lodge", "hearth_cottage", "carpenter_workshop", "apothecary_house", "astral_academy", "sky_court_palace", "guild_office", "arched_customs_house", "courtyard_inn", "great_civic_basilica", "octagonal_bathhouse", "imperial_court", "twin_tower_college", "royal_amphitheatre", "canal_art_gallery"].includes(KIT?.design)) return;
   const box=new THREE.Box3();
   for(const s of Object.values(slots))box.union(boxOf(s,offOf(s.module)));
   const c=box.getCenter(new THREE.Vector3()),vf=THREE.MathUtils.degToRad(camera.fov/2),hf=Math.atan(Math.tan(vf)*camera.aspect);
   const distance=box.getSize(new THREE.Vector3()).length()/2/Math.sin(Math.min(vf,hf))*1.08;
-  controls.target.copy(c);camera.position.copy(c).addScaledVector(new THREE.Vector3(.72,.45,1).normalize(),distance);
+  controls.target.copy(c);camera.position.copy(c).addScaledVector(new THREE.Vector3(...(theatre ? [.24,.17,1] : [.72,.45,1])).normalize(),distance);
   camera.near=.1;camera.far=Math.max(camera.far,distance*10);camera.updateProjectionMatrix();controls.update();
 }
 function finish() {
